@@ -1,0 +1,4 @@
+Customer_ID,Customer_Name,Age,City,Transaction_Amount
+CUST001,Rahul Sharma,29,Bangalore,12500
+CUST002,Priya Nair,34,Mumbai,28500
+CUST003,Arjun Kumar,24,Chennai,4200
