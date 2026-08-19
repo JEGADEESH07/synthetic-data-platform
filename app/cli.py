@@ -1,6 +1,8 @@
 import argparse
 
-from app.pipeline import run_pipeline
+from app.services.synthetic_data_service import (
+    SyntheticDataService,
+)
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -9,7 +11,7 @@ def create_parser() -> argparse.ArgumentParser:
     """
 
     parser = argparse.ArgumentParser(
-        description="Synthetic Data Platform V0.2"
+        description="Synthetic Data Platform V0.3"
     )
 
     subparsers = parser.add_subparsers(
@@ -59,10 +61,12 @@ def create_parser() -> argparse.ArgumentParser:
 
 def execute_generate(args) -> dict:
     """
-    Execute the generate command.
+    Execute the generate command through the application service.
     """
 
-    return run_pipeline(
+    service = SyntheticDataService()
+
+    return service.generate(
         input_path=args.input,
         output_rows=args.rows,
         epochs=args.epochs,
@@ -77,13 +81,12 @@ def main() -> None:
     """
 
     parser = create_parser()
-
     args = parser.parse_args()
 
     if args.command == "generate":
 
         print(
-            "Starting Synthetic Data Platform V0.2..."
+            "Starting Synthetic Data Platform V0.3..."
         )
 
         print(f"Input: {args.input}")

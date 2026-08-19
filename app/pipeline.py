@@ -2,6 +2,7 @@ from app.config.settings import (
     DEFAULT_CONFIG,
     validate_generation_parameters,
 )
+from app.evaluation.evaluator import EvaluationEngine
 
 from app.ingestion.loader import load_dataset
 
@@ -21,16 +22,6 @@ from app.privacy.identifier_generator import (
 from app.generation.ctgan_generator import (
     train_ctgan,
     generate_synthetic_data,
-)
-
-from app.validation.schema_validator import (
-    validate_schema,
-)
-from app.validation.statistical_validator import (
-    evaluate_statistical_quality,
-)
-from app.validation.privacy_validator import (
-    evaluate_privacy,
 )
 
 from app.output.writer import (
@@ -167,52 +158,26 @@ def run_pipeline(
     ]
 
     # --------------------------------------------------
-    # 11. SCHEMA VALIDATION
+    # 11. TRUST EVALUATION
     # --------------------------------------------------
 
-    schema_report = validate_schema(
-        df_real,
-        final_data,
+    evaluation_result = EvaluationEngine().evaluate(
+        real_data=df_real,
+        synthetic_data=final_data,
+        identifier_columns=identifier_columns,
     )
+
     logger.info(
-    "Schema validation completed | valid=%s",
-    schema_report["valid"],
+        "Schema validation completed | valid=%s",
+        evaluation_result.schema_valid,
     )
 
-    # --------------------------------------------------
-    # 12. STATISTICAL QUALITY
-    # --------------------------------------------------
-
-    quality_report = evaluate_statistical_quality(
-        df_real,
-        final_data,
-        identifier_columns,
-    )
-
-    # --------------------------------------------------
-    # 13. PRIVACY
-    # --------------------------------------------------
-
-    privacy_report = evaluate_privacy(
-        df_real,
-        final_data,
-        identifier_columns,
-    )
     logger.info(
-    "Privacy evaluation completed | safe=%s",
-    privacy_report["safe"],
+        "Privacy evaluation completed | safe=%s",
+        evaluation_result.privacy_safe,
     )
 
-    # --------------------------------------------------
-    # 14. EVALUATION
-    # --------------------------------------------------
-
-    evaluation = {
-        "schema": schema_report,
-        "statistical_quality": quality_report,
-        "privacy": privacy_report,
-    }
-
+    evaluation = evaluation_result.to_dict()
     # --------------------------------------------------
     # 15. OUTPUT
     # --------------------------------------------------

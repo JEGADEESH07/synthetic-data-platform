@@ -1,6 +1,22 @@
 from dataclasses import dataclass
 from pathlib import Path
 
+@dataclass(frozen=True)
+class QualityPolicy:
+    """
+    Defines minimum quality requirements for
+    synthetic-data generation.
+    """
+
+    minimum_trust_score: float = 0.70
+
+    require_schema_valid: bool = True
+
+    require_privacy_safe: bool = True
+
+    mode: str = "regenerate"
+
+    max_regeneration_attempts: int = 3
 
 @dataclass(frozen=True)
 class PipelineConfig:
@@ -28,9 +44,55 @@ class PipelineConfig:
 
     max_epochs: int = 10_000
 
+    job_database_path: str = "data/output/jobs.db"
+
 
 DEFAULT_CONFIG = PipelineConfig()
+DEFAULT_QUALITY_POLICY = QualityPolicy()
 
+def validate_quality_policy(
+    policy: QualityPolicy,
+) -> None:
+    """
+    Validate quality-policy configuration.
+    """
+
+    if not (
+        0.0
+        <= policy.minimum_trust_score
+        <= 1.0
+    ):
+        raise ValueError(
+            "minimum_trust_score must be "
+            "between 0.0 and 1.0."
+        )
+
+    allowed_modes = {
+        "report",
+        "block",
+        "regenerate",
+    }
+
+    if policy.mode not in allowed_modes:
+        raise ValueError(
+            "mode must be one of: "
+            "report, block, regenerate."
+        )
+
+    if policy.max_regeneration_attempts < 0:
+        raise ValueError(
+            "max_regeneration_attempts must "
+            "be greater than or equal to zero."
+        )
+
+    if (
+        policy.mode == "regenerate"
+        and policy.max_regeneration_attempts == 0
+    ):
+        raise ValueError(
+            "Regenerate mode requires at least "
+            "one regeneration attempt."
+        )
 
 def validate_generation_parameters(
     output_rows: int,
