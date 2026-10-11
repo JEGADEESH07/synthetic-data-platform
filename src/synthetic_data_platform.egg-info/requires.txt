@@ -6,6 +6,8 @@ pydantic<3.0,>=2.0
 pyyaml<7.0,>=6.0
 typer<1.0,>=0.16
 rich<15.0,>=14.0
+fastapi<1.0,>=0.115
+uvicorn<1.0,>=0.34
 
 [dev]
 pytest<9.0,>=8.0
