@@ -1,8 +1,8 @@
+from contextlib import asynccontextmanager
 from uuid import uuid4
-
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
-
+from synthetic_data.queue.job_queue import JobQueue
 from synthetic_data import __version__
 from synthetic_data.api.errors import (
     APIError,
@@ -29,20 +29,53 @@ from synthetic_data.jobs.repository import JobRepository
 from synthetic_data.jobs.service import JobService
 from synthetic_data.api.logging import configure_api_logging
 
-app = FastAPI(
-    title="Synthetic Data Engineering & Privacy Platform",
-    version=__version__,
-    description="V0.3 execution platform API.",
-)
-
-app.add_exception_handler(APIError, api_error_handler)
+from synthetic_data.worker.background import BackgroundWorker
+from synthetic_data.worker.engine import V02Engine
+from synthetic_data.worker.executor import JobExecutionAdapter
+from synthetic_data.worker.runtime import Worker
 
 
 job_repository = JobRepository("data/output/jobs/jobs.db")
 job_service = JobService(job_repository)
 artifact_manager = ArtifactManager("data/output/jobs")
 logger = configure_api_logging()
+job_queue = JobQueue()
 
+engine = V02Engine(output_root="data/output/jobs")
+
+execution_adapter = JobExecutionAdapter(
+    job_service=job_service,
+    engine=engine,
+)
+
+worker = Worker(
+    job_queue=job_queue,
+    job_service=job_service,
+    executor=execution_adapter.execute,
+)
+
+background_worker = BackgroundWorker(
+    worker=worker,
+)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    background_worker.start()
+
+    try:
+        yield
+    finally:
+        background_worker.stop()
+
+
+app = FastAPI(
+    title="Synthetic Data Engineering & Privacy Platform",
+    version=__version__,
+    description="V0.3 execution platform API.",
+    lifespan=lifespan,
+)
+app.add_exception_handler(APIError, api_error_handler)
 @app.get("/api/v1/health")
 def health_check() -> dict[str, str]:
     return {"status": "healthy"}
@@ -81,6 +114,10 @@ def create_job(request: JobCreateRequest) -> JobCreateResponse:
             input_file=request.input_file,
             row_count=request.row_count,
         )
+        job_service.queue_job(job_id)
+        job_queue.enqueue(job_id)
+
+        job = job_service.get_job(job_id)
 
         logger.info(
             "Job created | job_id=%s | row_count=%s",

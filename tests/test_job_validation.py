@@ -88,4 +88,4 @@ def test_valid_input_is_accepted():
     body = response.json()
 
     assert body["job_id"]
-    assert body["status"] == "CREATED"
+    assert body["status"] == "QUEUED"

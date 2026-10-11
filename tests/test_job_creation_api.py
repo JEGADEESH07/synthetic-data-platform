@@ -20,7 +20,7 @@ def test_create_job():
     body = response.json()
 
     assert "job_id" in body
-    assert body["status"] == "CREATED"
+    assert body["status"] == "QUEUED"
 
 
 def test_create_job_requires_input_file():

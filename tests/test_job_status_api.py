@@ -27,7 +27,7 @@ def test_get_job_status():
     body = response.json()
 
     assert body["job_id"] == job_id
-    assert body["status"] == "CREATED"
+    assert body["status"] == "QUEUED"
     assert body["input_file"] == "data/input/dev_dataset.csv"
     assert body["row_count"] == 1000
     assert body["created_at"] is not None
