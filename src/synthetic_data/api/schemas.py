@@ -28,3 +28,7 @@ class JobStatusResponse(BaseModel):
 class ArtifactListResponse(BaseModel):
     job_id: str
     artifacts: list[str]
+
+class ErrorResponse(BaseModel):
+    error_code: str
+    message: str

@@ -1,22 +1,28 @@
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 
 from synthetic_data import __version__
+from synthetic_data.api.errors import (
+    APIError,
+    ArtifactNotFoundAPIError,
+    JobNotFoundError,
+    api_error_handler,
+)
 from synthetic_data.api.schemas import (
-    JobCreateRequest,
     ArtifactListResponse,
+    JobCreateRequest,
     JobCreateResponse,
     JobStatusResponse,
 )
-from synthetic_data.jobs.repository import JobRepository
-from synthetic_data.jobs.service import JobService
-from fastapi.responses import FileResponse
-
 from synthetic_data.jobs.artifacts import (
     ArtifactManager,
     ArtifactNotFoundError,
 )
+from synthetic_data.jobs.repository import JobRepository
+from synthetic_data.jobs.service import JobService
+
 
 app = FastAPI(
     title="Synthetic Data Engineering & Privacy Platform",
@@ -24,10 +30,13 @@ app = FastAPI(
     description="V0.3 execution platform API.",
 )
 
+app.add_exception_handler(APIError, api_error_handler)
+
 
 job_repository = JobRepository("data/output/jobs/jobs.db")
 job_service = JobService(job_repository)
 artifact_manager = ArtifactManager("data/output/jobs")
+
 
 @app.get("/api/v1/health")
 def health_check() -> dict[str, str]:
@@ -64,6 +73,7 @@ def create_job(request: JobCreateRequest) -> JobCreateResponse:
         status=job.status,
     )
 
+
 @app.get(
     "/api/v1/jobs/{job_id}",
     response_model=JobStatusResponse,
@@ -72,10 +82,7 @@ def get_job_status(job_id: str) -> JobStatusResponse:
     job = job_service.get_job(job_id)
 
     if job is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Job not found.",
-        )
+        raise JobNotFoundError()
 
     return JobStatusResponse(
         job_id=job.job_id,
@@ -99,6 +106,7 @@ def get_job_status(job_id: str) -> JobStatusResponse:
         error_message=job.error_message,
     )
 
+
 @app.get(
     "/api/v1/jobs/{job_id}/artifacts",
     response_model=ArtifactListResponse,
@@ -107,18 +115,12 @@ def list_job_artifacts(job_id: str) -> ArtifactListResponse:
     job = job_service.get_job(job_id)
 
     if job is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Job not found.",
-        )
+        raise JobNotFoundError()
 
     try:
         artifacts = artifact_manager.get_artifacts(job_id)
     except ArtifactNotFoundError:
-        raise HTTPException(
-            status_code=404,
-            detail="Artifacts not found for job.",
-        )
+        raise ArtifactNotFoundAPIError()
 
     return ArtifactListResponse(
         job_id=job_id,
@@ -127,6 +129,7 @@ def list_job_artifacts(job_id: str) -> ArtifactListResponse:
             artifacts.report_path.name,
         ],
     )
+
 
 @app.get(
     "/api/v1/jobs/{job_id}/artifacts/{artifact_name}",
@@ -138,18 +141,12 @@ def get_job_artifact(
     job = job_service.get_job(job_id)
 
     if job is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Job not found.",
-        )
+        raise JobNotFoundError()
 
     try:
         artifacts = artifact_manager.get_artifacts(job_id)
     except ArtifactNotFoundError:
-        raise HTTPException(
-            status_code=404,
-            detail="Artifacts not found for job.",
-        )
+        raise ArtifactNotFoundAPIError()
 
     artifact_paths = {
         "synthetic_data.csv": artifacts.synthetic_data_path,
@@ -159,10 +156,7 @@ def get_job_artifact(
     artifact_path = artifact_paths.get(artifact_name)
 
     if artifact_path is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Artifact not found.",
-        )
+        raise ArtifactNotFoundAPIError()
 
     return FileResponse(
         path=artifact_path,
