@@ -43,7 +43,9 @@ src/synthetic_data/queue/job_queue.py
 src/synthetic_data/validation/__init__.py
 src/synthetic_data/validation/schema_validator.py
 src/synthetic_data/worker/__init__.py
+src/synthetic_data/worker/background.py
 src/synthetic_data/worker/engine.py
+src/synthetic_data/worker/executor.py
 src/synthetic_data/worker/runtime.py
 src/synthetic_data_platform.egg-info/PKG-INFO
 src/synthetic_data_platform.egg-info/SOURCES.txt
@@ -54,16 +56,21 @@ src/synthetic_data_platform.egg-info/top_level.txt
 tests/test_api_errors.py
 tests/test_api_foundation.py
 tests/test_artifact_api.py
+tests/test_background_worker.py
 tests/test_cli.py
 tests/test_config.py
+tests/test_end_to_end_api.py
 tests/test_engine_integration.py
 tests/test_generation.py
 tests/test_identifiers.py
 tests/test_ingestion.py
 tests/test_job_artifacts.py
 tests/test_job_creation_api.py
+tests/test_job_execution_adapter.py
+tests/test_job_lifecycle.py
 tests/test_job_model.py
 tests/test_job_queue.py
+tests/test_job_queue_api.py
 tests/test_job_repository.py
 tests/test_job_result.py
 tests/test_job_service.py
@@ -77,4 +84,5 @@ tests/test_privacy.py
 tests/test_profiling.py
 tests/test_schema_validation.py
 tests/test_statistical_evaluation.py
+tests/test_worker_engine_execution.py
 tests/test_worker_runtime.py
