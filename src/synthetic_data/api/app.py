@@ -27,7 +27,7 @@ from synthetic_data.jobs.artifacts import (
 )
 from synthetic_data.jobs.repository import JobRepository
 from synthetic_data.jobs.service import JobService
-
+from synthetic_data.api.logging import configure_api_logging
 
 app = FastAPI(
     title="Synthetic Data Engineering & Privacy Platform",
@@ -41,7 +41,7 @@ app.add_exception_handler(APIError, api_error_handler)
 job_repository = JobRepository("data/output/jobs/jobs.db")
 job_service = JobService(job_repository)
 artifact_manager = ArtifactManager("data/output/jobs")
-
+logger = configure_api_logging()
 
 @app.get("/api/v1/health")
 def health_check() -> dict[str, str]:
@@ -59,12 +59,18 @@ def version() -> dict[str, str]:
     status_code=201,
 )
 def create_job(request: JobCreateRequest) -> JobCreateResponse:
+
     try:
         validate_job_input(
             input_file=request.input_file,
             row_count=request.row_count,
         )
     except JobValidationError as exc:
+        logger.warning(
+            "Job validation failed | row_count=%s | error=%s",
+            request.row_count,
+            str(exc),
+        )
         raise JobValidationAPIError(str(exc)) from exc
 
     job_id = str(uuid4())
@@ -75,7 +81,18 @@ def create_job(request: JobCreateRequest) -> JobCreateResponse:
             input_file=request.input_file,
             row_count=request.row_count,
         )
+
+        logger.info(
+            "Job created | job_id=%s | row_count=%s",
+            job.job_id,
+            job.row_count,
+        )
+
     except Exception as exc:
+        logger.exception(
+            "Job creation failed | job_id=%s",
+            job_id,
+        )
         raise HTTPException(
             status_code=500,
             detail="Unable to create job.",

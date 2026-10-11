@@ -11,7 +11,7 @@ def test_get_job_status():
     created = client.post(
         "/api/v1/jobs",
         json={
-            "input_file": "data/input/customer_data.csv",
+            "input_file": "data/input/dev_dataset.csv",
             "row_count": 1000,
         },
     )
@@ -28,7 +28,7 @@ def test_get_job_status():
 
     assert body["job_id"] == job_id
     assert body["status"] == "CREATED"
-    assert body["input_file"] == "data/input/customer_data.csv"
+    assert body["input_file"] == "data/input/dev_dataset.csv"
     assert body["row_count"] == 1000
     assert body["created_at"] is not None
 
@@ -39,4 +39,8 @@ def test_get_unknown_job_returns_404():
     )
 
     assert response.status_code == 404
-    assert response.json()["detail"] == "Job not found."
+
+    assert response.json() == {
+        "error_code": "JOB_NOT_FOUND",
+        "message": "Job not found.",
+    }

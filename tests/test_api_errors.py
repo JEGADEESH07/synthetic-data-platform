@@ -39,7 +39,7 @@ def test_unknown_artifact_name_returns_structured_error(tmp_path, monkeypatch):
     job_response = client.post(
         "/api/v1/jobs",
         json={
-            "input_file": "data/input/customer_data.csv",
+            "input_file": "data/input/dev_dataset.csv",
             "row_count": 100,
         },
     )

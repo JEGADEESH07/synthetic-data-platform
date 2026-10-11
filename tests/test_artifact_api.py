@@ -13,7 +13,7 @@ def test_list_job_artifacts(tmp_path, monkeypatch):
     job_response = client.post(
         "/api/v1/jobs",
         json={
-            "input_file": "data/input/customer_data.csv",
+            "input_file": "data/input/dev_dataset.csv",
             "row_count": 100,
         },
     )
@@ -58,7 +58,7 @@ def test_get_job_artifact(tmp_path, monkeypatch):
     job_response = client.post(
         "/api/v1/jobs",
         json={
-            "input_file": "data/input/customer_data.csv",
+            "input_file": "data/input/dev_dataset.csv",
             "row_count": 100,
         },
     )

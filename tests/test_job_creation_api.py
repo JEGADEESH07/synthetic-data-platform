@@ -10,7 +10,7 @@ def test_create_job():
     response = client.post(
         "/api/v1/jobs",
         json={
-            "input_file": "data/input/customer_data.csv",
+            "input_file": "data/input/dev_dataset.csv",
             "row_count": 1000,
         },
     )
@@ -38,7 +38,7 @@ def test_create_job_requires_positive_row_count():
     response = client.post(
         "/api/v1/jobs",
         json={
-            "input_file": "data/input/customer_data.csv",
+            "input_file": "data/input/dev_dataset.csv",
             "row_count": 0,
         },
     )
