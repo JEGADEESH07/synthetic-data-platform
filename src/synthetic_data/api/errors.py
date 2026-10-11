@@ -46,3 +46,11 @@ async def api_error_handler(
             "message": exc.message,
         },
     )
+
+class JobValidationAPIError(APIError):
+    def __init__(self, message: str):
+        super().__init__(
+            error_code="JOB_VALIDATION_ERROR",
+            message=message,
+            status_code=400,
+        )

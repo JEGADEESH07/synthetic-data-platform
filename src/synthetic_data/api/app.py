@@ -8,7 +8,12 @@ from synthetic_data.api.errors import (
     APIError,
     ArtifactNotFoundAPIError,
     JobNotFoundError,
+    JobValidationAPIError,
     api_error_handler,
+)
+from synthetic_data.api.validation import (
+    JobValidationError,
+    validate_job_input,
 )
 from synthetic_data.api.schemas import (
     ArtifactListResponse,
@@ -54,6 +59,14 @@ def version() -> dict[str, str]:
     status_code=201,
 )
 def create_job(request: JobCreateRequest) -> JobCreateResponse:
+    try:
+        validate_job_input(
+            input_file=request.input_file,
+            row_count=request.row_count,
+        )
+    except JobValidationError as exc:
+        raise JobValidationAPIError(str(exc)) from exc
+
     job_id = str(uuid4())
 
     try:
