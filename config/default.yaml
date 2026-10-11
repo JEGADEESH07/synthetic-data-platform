@@ -1,0 +1,12 @@
+generation:
+  default_row_count: 1000
+  ctgan_epochs: 10
+
+output:
+  directory: data/output/jobs
+
+quality:
+  minimum_score: 0.80
+
+privacy:
+  fail_on_exact_match: true
