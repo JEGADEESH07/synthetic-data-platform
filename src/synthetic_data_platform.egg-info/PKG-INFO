@@ -1,0 +1,45 @@
+Metadata-Version: 2.4
+Name: synthetic-data-platform
+Version: 0.2.0
+Summary: Synthetic data engineering and privacy evaluation platform
+Requires-Python: <3.13,>=3.12
+Description-Content-Type: text/markdown
+Requires-Dist: pandas<3.0,>=2.2
+Requires-Dist: numpy<3.0,>=2.0
+Requires-Dist: sdv<2.0,>=1.38
+Requires-Dist: faker<38,>=37
+Requires-Dist: pydantic<3.0,>=2.0
+Requires-Dist: pyyaml<7.0,>=6.0
+Requires-Dist: typer<1.0,>=0.16
+Requires-Dist: rich<15.0,>=14.0
+Provides-Extra: dev
+Requires-Dist: pytest<9.0,>=8.0; extra == "dev"
+Requires-Dist: pytest-cov<7.0,>=6.0; extra == "dev"
+
+﻿# Synthetic Data Engineering & Privacy Platform
+
+V0.2 — Core Platform
+
+A modular synthetic data engineering and privacy evaluation platform designed
+to generate useful synthetic datasets while evaluating schema integrity,
+statistical quality, and privacy risk.
+
+## V0.2 Status
+
+Development in progress.
+
+## Project Structure
+
+- src/ — application source code
+- tests/ — automated tests
+- config/ — configuration
+- data/input/ — input datasets
+- data/output/ — generated artifacts
+- scripts/ — development and utility scripts
+- docs/ — technical documentation
+
+## Development Environment
+
+- Python 3.12
+- Git
+- Docker

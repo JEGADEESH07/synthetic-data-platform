@@ -1,0 +1,12 @@
+pandas<3.0,>=2.2
+numpy<3.0,>=2.0
+sdv<2.0,>=1.38
+faker<38,>=37
+pydantic<3.0,>=2.0
+pyyaml<7.0,>=6.0
+typer<1.0,>=0.16
+rich<15.0,>=14.0
+
+[dev]
+pytest<9.0,>=8.0
+pytest-cov<7.0,>=6.0
