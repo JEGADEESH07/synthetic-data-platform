@@ -24,3 +24,7 @@ class JobStatusResponse(BaseModel):
     report_path: str | None
     error_code: str | None
     error_message: str | None
+
+class ArtifactListResponse(BaseModel):
+    job_id: str
+    artifacts: list[str]
