@@ -8,6 +8,7 @@ from synthetic_data.config.settings import (
     PrivacyConfig,
     QualityConfig,
     load_config,
+    InputConfig,
 )
 
 __all__ = [
