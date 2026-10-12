@@ -55,6 +55,7 @@ def test_non_csv_file_is_rejected():
     assert response.json() == {
         "error_code": "JOB_VALIDATION_ERROR",
         "message": "Input file must be a CSV file.",
+        "request_id": response.json()["request_id"],
     }
 
 
@@ -71,6 +72,7 @@ def test_missing_input_file_path_is_rejected():
     assert response.json() == {
         "error_code": "JOB_VALIDATION_ERROR",
         "message": "Input file does not exist.",
+        "request_id": response.json()["request_id"],
     }
 
 

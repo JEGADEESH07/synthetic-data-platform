@@ -45,7 +45,56 @@ def test_get_unknown_job_returns_404():
 
     assert response.status_code == 404
 
-    assert response.json() == {
-        "error_code": "JOB_NOT_FOUND",
-        "message": "Job not found.",
-    }
+    body = response.json()
+
+    assert body["error_code"] == "JOB_NOT_FOUND"
+    assert body["message"] == "Job not found."
+    assert body["request_id"] == response.headers["X-Request-ID"]
+
+def test_request_id_is_generated_when_not_supplied():
+    response = client.get(
+        "/api/v1/version",
+    )
+
+    assert response.status_code == 200
+
+    request_id = response.headers.get("X-Request-ID")
+
+    assert request_id is not None
+    assert len(request_id) > 0
+    assert response.json()["version"]
+
+def test_supplied_request_id_is_preserved():
+    request_id = "test-request-123"
+
+    response = client.get(
+        "/api/v1/version",
+        headers={
+            "X-Request-ID": request_id,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["X-Request-ID"] == request_id
+
+def test_validation_error_contains_request_id():
+    request_id = "validation-test-123"
+
+    response = client.post(
+        "/api/v1/jobs",
+        json={
+            "input_file": "data/input/does-not-exist.csv",
+            "row_count": 1000,
+        },
+        headers={
+            "X-Request-ID": request_id,
+        },
+    )
+
+    assert response.status_code == 400
+
+    body = response.json()
+
+    assert body["error_code"] == "JOB_VALIDATION_ERROR"
+    assert body["request_id"] == request_id
+    assert response.headers["X-Request-ID"] == request_id

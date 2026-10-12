@@ -1,12 +1,11 @@
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
-from datetime import datetime, timezone
-
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from synthetic_data.api.metrics import Metrics
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
-
-from synthetic_data.queue.job_queue import JobQueue
+from fastapi.exceptions import RequestValidationError
 from synthetic_data import __version__
 from synthetic_data.api.errors import (
     APIError,
@@ -14,11 +13,11 @@ from synthetic_data.api.errors import (
     JobNotFoundError,
     JobValidationAPIError,
     api_error_handler,
+    http_exception_handler,
+    unexpected_exception_handler,
+    validation_exception_handler,
 )
-from synthetic_data.api.validation import (
-    JobValidationError,
-    validate_job_input,
-)
+from synthetic_data.api.logging import configure_api_logging
 from synthetic_data.api.schemas import (
     ArtifactListResponse,
     JobCreateRequest,
@@ -30,14 +29,17 @@ from synthetic_data.api.uploads import (
     save_uploaded_csv,
     validate_uploaded_csv,
 )
+from synthetic_data.api.validation import (
+    JobValidationError,
+    validate_job_input,
+)
 from synthetic_data.jobs.artifacts import (
     ArtifactManager,
     ArtifactNotFoundError,
 )
 from synthetic_data.jobs.repository import JobRepository
 from synthetic_data.jobs.service import JobService
-from synthetic_data.api.logging import configure_api_logging
-
+from synthetic_data.queue.job_queue import JobQueue
 from synthetic_data.worker.background import BackgroundWorker
 from synthetic_data.worker.engine import V02Engine
 from synthetic_data.worker.executor import JobExecutionAdapter
@@ -48,6 +50,7 @@ job_repository = JobRepository("data/output/jobs/jobs.db")
 job_service = JobService(job_repository)
 artifact_manager = ArtifactManager("data/output/jobs")
 logger = configure_api_logging()
+metrics = Metrics()
 job_queue = JobQueue()
 
 engine = V02Engine(output_root="data/output/jobs")
@@ -61,6 +64,7 @@ worker = Worker(
     job_queue=job_queue,
     job_service=job_service,
     executor=execution_adapter.execute,
+    metrics=metrics,
 )
 
 background_worker = BackgroundWorker(
@@ -81,19 +85,82 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Synthetic Data Engineering & Privacy Platform",
     version=__version__,
-    description="V0.3 execution platform API.",
+    description=(
+        "V0.3 execution platform API for submitting synthetic data "
+        "generation jobs, monitoring execution, and retrieving artifacts."
+    ),
     lifespan=lifespan,
 )
 
 app.add_exception_handler(APIError, api_error_handler)
 
+app.add_exception_handler(
+    HTTPException,
+    http_exception_handler,
+)
 
-@app.get("/api/v1/health")
+app.add_exception_handler(
+    RequestValidationError,
+    validation_exception_handler,
+)
+
+app.add_exception_handler(
+    Exception,
+    unexpected_exception_handler,
+)
+
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    request_id = request.headers.get("X-Request-ID")
+
+    if not request_id:
+        request_id = str(uuid4())
+
+    request.state.request_id = request_id
+    metrics.increment_http_requests()
+    response = await call_next(request)
+    metrics.increment_http_requests_completed()
+    response.headers["X-Request-ID"] = request_id
+    logger.info(
+        "HTTP request completed",
+        extra={
+            "request_id": request_id,
+            "method": request.method,
+            "path": request.url.path,
+            "status": response.status_code,
+        },
+    )
+
+    return response
+
+
+@app.get(
+    "/api/v1/health",
+    summary="Check API liveness",
+    description="Returns healthy when the API process is running.",
+)
 def health_check() -> dict[str, str]:
     return {"status": "healthy"}
 
 
-@app.get("/api/v1/version")
+@app.get(
+    "/api/v1/readiness",
+    summary="Check API readiness",
+    description=(
+        "Returns ready when the API can access its job repository "
+        "and runtime dependencies."
+    ),
+)
+def readiness_check() -> dict[str, str]:
+    job_repository.get("__readiness_check__")
+
+    return {"status": "ready"}
+
+@app.get(
+    "/api/v1/version",
+    summary="Get API version",
+    description="Returns the current API version."
+)
 def version() -> dict[str, str]:
     return {"version": __version__}
 
@@ -103,19 +170,23 @@ def version() -> dict[str, str]:
     response_model=JobCreateResponse,
     status_code=201,
 )
-def create_job(request: JobCreateRequest) -> JobCreateResponse:
 
+def create_job(request: JobCreateRequest) -> JobCreateResponse:
     try:
         validate_job_input(
             input_file=request.input_file,
             row_count=request.row_count,
         )
+
     except JobValidationError as exc:
         logger.warning(
-            "Job validation failed | row_count=%s | error=%s",
-            request.row_count,
-            str(exc),
+            "Job validation failed",
+            extra={
+                "row_count": request.row_count,
+                "error": str(exc),
+            },
         )
+
         raise JobValidationAPIError(str(exc)) from exc
 
     job_id = str(uuid4())
@@ -126,23 +197,28 @@ def create_job(request: JobCreateRequest) -> JobCreateResponse:
             input_file=request.input_file,
             row_count=request.row_count,
         )
-
+        metrics.increment_jobs_created()
         job_service.queue_job(job_id)
         job_queue.enqueue(job_id)
 
         job = job_service.get_job(job_id)
 
         logger.info(
-            "Job created | job_id=%s | row_count=%s",
-            job.job_id,
-            job.row_count,
+            "Job created",
+            extra={
+                "job_id": job.job_id,
+                "row_count": job.row_count,
+            },
         )
 
     except Exception as exc:
         logger.exception(
-            "Job creation failed | job_id=%s",
-            job_id,
+            "Job creation failed",
+            extra={
+                "job_id": job_id,
+            },
         )
+
         raise HTTPException(
             status_code=500,
             detail="Unable to create job.",
@@ -196,8 +272,17 @@ async def create_job_from_upload(
             row_count=row_count,
             input_columns=input_columns,
         )
-
+        metrics.increment_jobs_created()
         job_queue.enqueue(job_id)
+
+        logger.info(
+            "Job created from upload",
+            extra={
+                "job_id": job.job_id,
+                "row_count": job.row_count,
+                "input_columns": job.input_columns,
+            },
+        )
 
         return JobCreateResponse(
             job_id=job.job_id,
@@ -208,13 +293,22 @@ async def create_job_from_upload(
         if uploaded_path is not None:
             uploaded_path.unlink(missing_ok=True)
 
+        logger.warning(
+            "Uploaded file validation failed",
+            extra={
+                "error": str(exc),
+            },
+        )
+
         raise JobValidationAPIError(str(exc)) from exc
 
     except Exception:
         if uploaded_path is not None:
             uploaded_path.unlink(missing_ok=True)
 
-        logger.exception("Failed to create job from uploaded file.")
+        logger.exception(
+            "Failed to create job from uploaded file.",
+        )
 
         raise HTTPException(
             status_code=500,
@@ -249,6 +343,7 @@ def get_job_status(job_id: str) -> JobStatusResponse:
 
     if job.started_at is not None:
         end_time = job.completed_at or datetime.now(timezone.utc)
+
         duration_seconds = (
             end_time - job.started_at
         ).total_seconds()
@@ -294,6 +389,7 @@ def list_job_artifacts(job_id: str) -> ArtifactListResponse:
 
     try:
         artifacts = artifact_manager.get_artifacts(job_id)
+
     except ArtifactNotFoundError:
         raise ArtifactNotFoundAPIError()
 
@@ -320,6 +416,7 @@ def get_job_artifact(
 
     try:
         artifacts = artifact_manager.get_artifacts(job_id)
+
     except ArtifactNotFoundError:
         raise ArtifactNotFoundAPIError()
 

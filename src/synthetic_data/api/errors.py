@@ -1,9 +1,10 @@
-from fastapi import Request
+from fastapi import HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 
 class APIError(Exception):
-    """Base exception for safe API errors."""
+    """Base exception for expected API errors."""
 
     def __init__(
         self,
@@ -35,18 +36,6 @@ class ArtifactNotFoundAPIError(APIError):
         )
 
 
-async def api_error_handler(
-    request: Request,
-    exc: APIError,
-) -> JSONResponse:
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={
-            "error_code": exc.error_code,
-            "message": exc.message,
-        },
-    )
-
 class JobValidationAPIError(APIError):
     def __init__(self, message: str):
         super().__init__(
@@ -54,3 +43,103 @@ class JobValidationAPIError(APIError):
             message=message,
             status_code=400,
         )
+
+
+def _request_id(request: Request) -> str | None:
+    return getattr(
+        request.state,
+        "request_id",
+        None,
+    )
+
+
+async def api_error_handler(
+    request: Request,
+    exc: APIError,
+) -> JSONResponse:
+    request_id = _request_id(request)
+
+    content = {
+        "error_code": exc.error_code,
+        "message": exc.message,
+        "request_id": request_id,
+    }
+
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=content,
+        headers={
+            "X-Request-ID": request_id,
+        }
+        if request_id
+        else {},
+    )
+
+
+async def http_exception_handler(
+    request: Request,
+    exc: HTTPException,
+) -> JSONResponse:
+    request_id = _request_id(request)
+
+    content = {
+        "error_code": "HTTP_ERROR",
+        "message": (
+            exc.detail
+            if isinstance(exc.detail, str)
+            else "HTTP request failed."
+        ),
+        "request_id": request_id,
+    }
+
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=content,
+        headers={
+            "X-Request-ID": request_id,
+        }
+        if request_id
+        else {},
+    )
+
+
+async def validation_exception_handler(
+    request: Request,
+    exc: RequestValidationError,
+) -> JSONResponse:
+    request_id = _request_id(request)
+
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error_code": "REQUEST_VALIDATION_ERROR",
+            "message": "Request validation failed.",
+            "request_id": request_id,
+        },
+        headers={
+            "X-Request-ID": request_id,
+        }
+        if request_id
+        else {},
+    )
+
+
+async def unexpected_exception_handler(
+    request: Request,
+    exc: Exception,
+) -> JSONResponse:
+    request_id = _request_id(request)
+
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error_code": "INTERNAL_SERVER_ERROR",
+            "message": "An internal server error occurred.",
+            "request_id": request_id,
+        },
+        headers={
+            "X-Request-ID": request_id,
+        }
+        if request_id
+        else {},
+    )
