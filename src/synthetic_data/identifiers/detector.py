@@ -33,6 +33,11 @@ _DIRECT_IDENTIFIER_PATTERNS = (
     "address",
 )
 
+_IDENTIFIER_SUFFIXES = (
+    "_id",
+    "_identifier",
+)
+
 
 def detect_identifiers(dataframe: pd.DataFrame) -> IdentifierDetection:
     """Detect likely direct identifiers using column-name rules."""
@@ -48,7 +53,10 @@ def detect_identifiers(dataframe: pd.DataFrame) -> IdentifierDetection:
     for column in dataframe.columns:
         normalized = str(column).strip().lower()
 
-        if normalized in _DIRECT_IDENTIFIER_PATTERNS:
+        if (
+            normalized in _DIRECT_IDENTIFIER_PATTERNS
+            or normalized.endswith(_IDENTIFIER_SUFFIXES)
+        ):
             direct_identifiers.append(str(column))
 
     protected_columns = tuple(direct_identifiers)

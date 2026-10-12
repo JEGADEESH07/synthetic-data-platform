@@ -61,12 +61,15 @@ def _generate_identifier_column(
 
     normalized = column_name.lower()
 
-    if normalized in {
-        "customer_id",
-        "user_id",
-        "client_id",
-        "account_id",
-    }:
+    if (
+        normalized in {
+            "customer_id",
+            "user_id",
+            "client_id",
+            "account_id",
+        }
+        or normalized.endswith(("_id", "_identifier"))
+    ):
         prefix = column_name.replace("_ID", "").replace("_id", "")
 
         values = [
