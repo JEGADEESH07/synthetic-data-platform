@@ -16,7 +16,7 @@ class FakeRepository:
         self.jobs[job.job_id] = job
 
 
-def test_job_lifecycle_transitions():
+def test_job_lifecycle_transitions(tmp_path):
     repository = FakeRepository()
     service = JobService(repository)
 
@@ -39,10 +39,19 @@ def test_job_lifecycle_transitions():
     assert job.status == JobStatus.RUNNING
     assert job.started_at is not None
 
+    synthetic_data_path = tmp_path / "synthetic_data.csv"
+    report_path = tmp_path / "report.json"
+
+    synthetic_data_path.write_text(
+        "id,name\n1,Alice\n",
+        encoding="utf-8",
+    )
+    report_path.write_text("{}", encoding="utf-8")
+
     service.mark_succeeded(
         job.job_id,
-        "data/output/jobs/lifecycle/synthetic_data.csv",
-        "data/output/jobs/lifecycle/report.json",
+        str(synthetic_data_path),
+        str(report_path),
     )
 
     job = service.get_job(job.job_id)
@@ -79,7 +88,8 @@ def test_job_lifecycle_failure():
     assert job.error_code == "JOB_EXECUTION_FAILED"
     assert job.error_message == "Simulated engine failure"
 
-def test_worker_completes_full_success_lifecycle():
+
+def test_worker_completes_full_success_lifecycle(tmp_path):
     from synthetic_data.jobs.service import JobService
     from synthetic_data.queue.job_queue import JobQueue
     from synthetic_data.worker.runtime import Worker
@@ -105,10 +115,16 @@ def test_worker_completes_full_success_lifecycle():
 
         assert current_job.status == JobStatus.RUNNING
 
-        return (
-            "data/output/jobs/test/synthetic_data.csv",
-            "data/output/jobs/test/report.json",
+        synthetic_data_path = tmp_path / "synthetic_data.csv"
+        report_path = tmp_path / "report.json"
+
+        synthetic_data_path.write_text(
+            "id,name\n1,Alice\n",
+            encoding="utf-8",
         )
+        report_path.write_text("{}", encoding="utf-8")
+
+        return str(synthetic_data_path), str(report_path)
 
     worker = Worker(
         job_queue=queue,
@@ -127,6 +143,7 @@ def test_worker_completes_full_success_lifecycle():
     assert final_job.completed_at is not None
     assert final_job.synthetic_data_path is not None
     assert final_job.report_path is not None
+
 
 def test_worker_completes_full_failure_lifecycle():
     from synthetic_data.jobs.service import JobService

@@ -1,12 +1,21 @@
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 from synthetic_data.jobs.artifacts import (
     ArtifactManager,
     ArtifactNotFoundError,
 )
-
+from synthetic_data.persistence import (
+    ArtifactPersistenceError,
+    persist_artifacts,
+)
+from synthetic_data.privacy.evaluator import (
+    DuplicatePrivacyResult,
+    PrivacyReport,
+)
+from synthetic_data.validation import SchemaValidationResult
 
 def test_get_artifacts(tmp_path):
     job_directory = tmp_path / "job-001"
@@ -72,3 +81,52 @@ def test_missing_report_raises_error(tmp_path):
         match="Report artifact not found",
     ):
         manager.get_artifacts("job-001")
+
+def test_persist_artifacts_cleans_partial_output_on_failure(
+    tmp_path,
+    monkeypatch,
+):
+    synthetic_dataframe = pd.DataFrame(
+        {
+            "id": [1, 2],
+            "name": ["A", "B"],
+        }
+    )
+
+    schema_result = SchemaValidationResult(
+        valid=True,
+        row_count=2,
+        column_count=2,
+        columns=["id", "name"],
+    )
+
+    privacy_report = PrivacyReport(
+    status="PASS",
+    identifier_results=(),
+    duplicates=DuplicatePrivacyResult(
+        duplicate_row_count=0,
+        duplicate_row_rate=0.0,
+    ),
+    )
+
+    def fail_write_text(*args, **kwargs):
+        raise OSError("simulated report write failure")
+
+    monkeypatch.setattr(
+        Path,
+        "write_text",
+        fail_write_text,
+    )
+
+    output_root = tmp_path / "jobs"
+
+    with pytest.raises(ArtifactPersistenceError):
+        persist_artifacts(
+            synthetic_dataframe=synthetic_dataframe,
+            schema_result=schema_result,
+            privacy_report=privacy_report,
+            output_root=output_root,
+            job_id="cleanup-test",
+        )
+
+    assert not (output_root / "cleanup-test").exists()

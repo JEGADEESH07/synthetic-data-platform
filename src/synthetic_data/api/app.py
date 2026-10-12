@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 from uuid import uuid4
+from datetime import datetime, timezone
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
@@ -182,7 +183,7 @@ async def create_job_from_upload(
             input_config,
         )
 
-        validate_uploaded_csv(
+        input_columns = validate_uploaded_csv(
             uploaded_path,
             input_config,
         )
@@ -193,6 +194,7 @@ async def create_job_from_upload(
             job_id=job_id,
             input_file=str(uploaded_path),
             row_count=row_count,
+            input_columns=input_columns,
         )
 
         job_queue.enqueue(job_id)
@@ -219,6 +221,7 @@ async def create_job_from_upload(
             detail="Failed to process uploaded file.",
         )
 
+
 def _get_input_config():
     """
     Return the platform input configuration.
@@ -242,11 +245,20 @@ def get_job_status(job_id: str) -> JobStatusResponse:
     if job is None:
         raise JobNotFoundError()
 
+    duration_seconds: float | None = None
+
+    if job.started_at is not None:
+        end_time = job.completed_at or datetime.now(timezone.utc)
+        duration_seconds = (
+            end_time - job.started_at
+        ).total_seconds()
+
     return JobStatusResponse(
         job_id=job.job_id,
         status=job.status,
         input_file=job.input_file,
         row_count=job.row_count,
+        input_columns=job.input_columns,
         created_at=job.created_at.isoformat(),
         started_at=(
             job.started_at.isoformat()
@@ -258,6 +270,11 @@ def get_job_status(job_id: str) -> JobStatusResponse:
             if job.completed_at is not None
             else None
         ),
+        duration_seconds=duration_seconds,
+        execution_stage=job.execution_stage,
+        progress=job.progress,
+        completed_units=job.completed_units,
+        total_units=job.total_units,
         synthetic_data_path=job.synthetic_data_path,
         report_path=job.report_path,
         error_code=job.error_code,

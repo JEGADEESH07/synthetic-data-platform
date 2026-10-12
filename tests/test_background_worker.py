@@ -39,7 +39,7 @@ def wait_for_status(service, job_id, expected_status, timeout=5):
     )
 
 
-def test_background_worker_executes_job():
+def test_background_worker_executes_job(tmp_path):
     repository = FakeRepository()
     service = JobService(repository)
     queue = JobQueue()
@@ -54,9 +54,24 @@ def test_background_worker_executes_job():
     queue.enqueue(job.job_id)
 
     def executor(job_id):
+        output_dir = tmp_path / "data" / "output" / "jobs" / job_id
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        synthetic_data_path = output_dir / "synthetic_data.csv"
+        report_path = output_dir / "report.json"
+
+        synthetic_data_path.write_text(
+            "id,name\n1,test\n",
+            encoding="utf-8",
+        )
+        report_path.write_text(
+            "{}",
+            encoding="utf-8",
+        )
+
         return (
-            "data/output/jobs/background-success/synthetic_data.csv",
-            "data/output/jobs/background-success/report.json",
+            str(synthetic_data_path),
+            str(report_path),
         )
 
     worker = Worker(

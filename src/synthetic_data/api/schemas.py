@@ -15,13 +15,23 @@ class JobCreateResponse(BaseModel):
 class JobStatusResponse(BaseModel):
     job_id: str
     status: JobStatus
+
     input_file: str
     row_count: int
+    input_columns: int | None
     created_at: str
     started_at: str | None
     completed_at: str | None
+    duration_seconds: float | None
+
+    execution_stage: str | None
+    progress: int | None
+    completed_units: int | None
+    total_units: int | None
+
     synthetic_data_path: str | None
     report_path: str | None
+
     error_code: str | None
     error_message: str | None
 

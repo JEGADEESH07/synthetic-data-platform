@@ -117,7 +117,7 @@ def save_uploaded_csv(
 def validate_uploaded_csv(
     file_path: Path,
     config: InputConfig,
-) -> None:
+) -> int:
     """
     Validate the stored upload against CSV integrity and row limits.
 
@@ -160,6 +160,7 @@ def validate_uploaded_csv(
                     raise UploadValidationError(
                         "Uploaded CSV exceeds the maximum allowed row limit."
                     )
+            return len(headers)
 
     except UnicodeDecodeError as exc:
         raise UploadValidationError(

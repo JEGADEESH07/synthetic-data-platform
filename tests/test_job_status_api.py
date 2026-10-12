@@ -31,6 +31,11 @@ def test_get_job_status():
     assert body["input_file"] == "data/input/dev_dataset.csv"
     assert body["row_count"] == 1000
     assert body["created_at"] is not None
+    assert body["execution_stage"] == "QUEUED"
+    assert body["progress"] == 0
+    assert body["completed_units"] is None
+    assert body["total_units"] is None
+    assert body["duration_seconds"] is None
 
 
 def test_get_unknown_job_returns_404():

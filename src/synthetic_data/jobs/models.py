@@ -27,6 +27,11 @@ class Job:
     )
     started_at: datetime | None = None
     completed_at: datetime | None = None
+    input_columns: int | None = None
+    execution_stage: str | None = None
+    progress: int | None = None
+    completed_units: int | None = None
+    total_units: int | None = None
 
     synthetic_data_path: str | None = None
     report_path: str | None = None

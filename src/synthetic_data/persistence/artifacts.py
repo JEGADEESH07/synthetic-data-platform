@@ -195,6 +195,16 @@ def persist_artifacts(
         )
 
     except Exception as exc:
+        try:
+            if output_directory.exists():
+                for path in output_directory.iterdir():
+                    if path.is_file() or path.is_symlink():
+                        path.unlink(missing_ok=True)
+
+                output_directory.rmdir()
+        except OSError:
+            pass
+
         raise ArtifactPersistenceError(
             "Failed to persist generation artifacts"
         ) from exc

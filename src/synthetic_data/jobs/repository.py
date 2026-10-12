@@ -28,6 +28,11 @@ class JobRepository:
                     created_at TEXT NOT NULL,
                     started_at TEXT,
                     completed_at TEXT,
+                    input_columns INTEGER,
+                    execution_stage TEXT,
+                    progress INTEGER,
+                    completed_units INTEGER,
+                    total_units INTEGER,
                     synthetic_data_path TEXT,
                     report_path TEXT,
                     error_code TEXT,
@@ -35,6 +40,21 @@ class JobRepository:
                 )
                 """
             )
+            existing_columns = {
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(jobs)")
+            }
+            for name, column_type in (
+                ("input_columns", "INTEGER"),
+                ("execution_stage", "TEXT"),
+                ("progress", "INTEGER"),
+                ("completed_units", "INTEGER"),
+                ("total_units", "INTEGER"),
+            ):
+                if name not in existing_columns:
+                    connection.execute(
+                        f"ALTER TABLE jobs ADD COLUMN {name} {column_type}"
+                    )
             connection.commit()
 
     def create(self, job: Job) -> None:
@@ -49,12 +69,17 @@ class JobRepository:
                     created_at,
                     started_at,
                     completed_at,
+                    input_columns,
+                    execution_stage,
+                    progress,
+                    completed_units,
+                    total_units,
                     synthetic_data_path,
                     report_path,
                     error_code,
                     error_message
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     job.job_id,
@@ -64,6 +89,11 @@ class JobRepository:
                     job.created_at.isoformat(),
                     self._serialize_datetime(job.started_at),
                     self._serialize_datetime(job.completed_at),
+                    job.input_columns,
+                    job.execution_stage,
+                    job.progress,
+                    job.completed_units,
+                    job.total_units,
                     job.synthetic_data_path,
                     job.report_path,
                     job.error_code,
@@ -96,6 +126,11 @@ class JobRepository:
                     created_at = ?,
                     started_at = ?,
                     completed_at = ?,
+                    input_columns = ?,
+                    execution_stage = ?,
+                    progress = ?,
+                    completed_units = ?,
+                    total_units = ?,
                     synthetic_data_path = ?,
                     report_path = ?,
                     error_code = ?,
@@ -109,6 +144,11 @@ class JobRepository:
                     job.created_at.isoformat(),
                     self._serialize_datetime(job.started_at),
                     self._serialize_datetime(job.completed_at),
+                    job.input_columns,
+                    job.execution_stage,
+                    job.progress,
+                    job.completed_units,
+                    job.total_units,
                     job.synthetic_data_path,
                     job.report_path,
                     job.error_code,
@@ -140,6 +180,11 @@ class JobRepository:
             created_at=cls._deserialize_datetime(row["created_at"]),
             started_at=cls._deserialize_datetime(row["started_at"]),
             completed_at=cls._deserialize_datetime(row["completed_at"]),
+            input_columns=row["input_columns"],
+            execution_stage=row["execution_stage"],
+            progress=row["progress"],
+            completed_units=row["completed_units"],
+            total_units=row["total_units"],
             synthetic_data_path=row["synthetic_data_path"],
             report_path=row["report_path"],
             error_code=row["error_code"],

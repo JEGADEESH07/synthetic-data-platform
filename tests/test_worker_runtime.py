@@ -31,7 +31,17 @@ def create_worker(tmp_path, executor):
 def test_worker_processes_job_successfully(tmp_path):
     def executor(job_id):
         assert job_id == "job-001"
-        return "synthetic_data.csv", "report.json"
+
+        synthetic_data_path = tmp_path / "synthetic_data.csv"
+        report_path = tmp_path / "report.json"
+
+        synthetic_data_path.write_text(
+            "id,name\n1,Alice\n",
+            encoding="utf-8",
+        )
+        report_path.write_text("{}", encoding="utf-8")
+
+        return str(synthetic_data_path), str(report_path)
 
     worker, service = create_worker(tmp_path, executor)
 
@@ -42,8 +52,8 @@ def test_worker_processes_job_successfully(tmp_path):
     job = service.get_job("job-001")
 
     assert job.status == JobStatus.SUCCEEDED
-    assert job.synthetic_data_path == "synthetic_data.csv"
-    assert job.report_path == "report.json"
+    assert job.synthetic_data_path.endswith("synthetic_data.csv")
+    assert job.report_path.endswith("report.json")
     assert job.started_at is not None
     assert job.completed_at is not None
 

@@ -8,7 +8,7 @@ from synthetic_data.pipeline import run_pipeline
 
 class EngineExecutionError(Exception):
     """Raised when the V0.2 engine execution fails."""
-
+    error_code = "ENGINE_FAILED"
 
 class V02Engine:
     """Adapter between the V0.3 worker and the frozen V0.2 engine."""

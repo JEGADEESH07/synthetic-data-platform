@@ -1,3 +1,5 @@
+from synthetic_data.worker.engine import EngineExecutionError
+
 import logging
 from collections.abc import Callable
 
@@ -48,6 +50,18 @@ class Worker:
             logger.info(
                 "Job execution succeeded | job_id=%s",
                 job_id,
+            )
+
+        except EngineExecutionError as exc:
+            logger.exception(
+                "Job execution failed | job_id=%s",
+                job_id,
+            )
+
+            self.job_service.mark_failed(
+                job_id,
+                error_code=exc.error_code,
+                error_message=str(exc),
             )
 
         except Exception as exc:

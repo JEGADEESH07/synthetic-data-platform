@@ -1,7 +1,8 @@
+from datetime import datetime, timedelta, timezone
 from synthetic_data.jobs.models import JobStatus
 from synthetic_data.jobs.repository import JobRepository
 from synthetic_data.jobs.service import JobService
-
+import pytest
 
 def create_service(tmp_path):
     repository = JobRepository(str(tmp_path / "jobs.db"))
@@ -68,10 +69,34 @@ def test_mark_succeeded_sets_artifacts(tmp_path):
     service.queue_job("job-004")
     service.mark_running("job-004")
 
+    synthetic_data_path = (
+        tmp_path
+        / "data"
+        / "output"
+        / "jobs"
+        / "job-004"
+        / "synthetic_data.csv"
+    )
+    report_path = (
+        tmp_path
+        / "data"
+        / "output"
+        / "jobs"
+        / "job-004"
+        / "report.json"
+    )
+
+    synthetic_data_path.parent.mkdir(parents=True, exist_ok=True)
+    synthetic_data_path.write_text(
+        "id,name\n1,Alice\n",
+        encoding="utf-8",
+    )
+    report_path.write_text("{}", encoding="utf-8")
+
     job = service.mark_succeeded(
         job_id="job-004",
-        synthetic_data_path="data/output/jobs/job-004/synthetic_data.csv",
-        report_path="data/output/jobs/job-004/report.json",
+        synthetic_data_path=str(synthetic_data_path),
+        report_path=str(report_path),
     )
 
     assert job.status == JobStatus.SUCCEEDED
@@ -120,6 +145,49 @@ def test_cannot_skip_job_lifecycle(tmp_path):
     else:
         raise AssertionError("Expected ValueError")
 
+def test_fail_stale_job_marks_old_running_job_failed(tmp_path):
+    service = create_service(tmp_path)
+
+    job = service.create_job(
+        job_id="stale-job",
+        input_file="data/input/dev_dataset.csv",
+        row_count=10,
+    )
+
+    service.queue_job(job.job_id)
+    service.mark_running(job.job_id)
+
+    job = service.get_job(job.job_id)
+    job.started_at = datetime.now(timezone.utc) - timedelta(seconds=120)
+    service.repository.update(job)
+
+    failed_job = service.fail_stale_job(
+        job.job_id,
+        stale_after_seconds=60,
+    )
+
+    assert failed_job.status == JobStatus.FAILED
+    assert failed_job.execution_stage == "FAILED"
+    assert failed_job.error_code == "STALE_JOB"
+    assert failed_job.completed_at is not None
+
+def test_fail_stale_job_rejects_fresh_running_job(tmp_path):
+    service = create_service(tmp_path)
+
+    job = service.create_job(
+        job_id="fresh-job",
+        input_file="data/input/dev_dataset.csv",
+        row_count=10,
+    )
+
+    service.queue_job(job.job_id)
+    service.mark_running(job.job_id)
+
+    with pytest.raises(ValueError, match="Job is not stale"):
+        service.fail_stale_job(
+            job.job_id,
+            stale_after_seconds=60,
+        )
 
 def test_unknown_job_returns_none(tmp_path):
     service = create_service(tmp_path)
