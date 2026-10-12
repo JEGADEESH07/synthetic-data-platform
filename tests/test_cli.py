@@ -39,6 +39,9 @@ quality:
 
 privacy:
   fail_on_exact_match: true
+
+input:
+  allowed_root: {tmp_path.as_posix()}
 """,
         encoding="utf-8",
     )
@@ -95,6 +98,9 @@ quality:
 
 privacy:
   fail_on_exact_match: true
+
+input:
+  allowed_root: {tmp_path.as_posix()}
 """,
         encoding="utf-8",
     )

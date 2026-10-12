@@ -68,12 +68,14 @@ def run_pipeline(
     )
 
     logger.info(
-        "Pipeline started | input=%s | requested_rows=%s",
-        file_path,
+        "Pipeline started | requested_rows=%s",
         resolved_row_count,
     )
 
-    source_dataframe = load_csv(file_path)
+    source_dataframe = load_csv(
+        file_path,
+        config=active_config.input,
+    )
 
     logger.info(
         "Dataset loaded | rows=%d | columns=%d",

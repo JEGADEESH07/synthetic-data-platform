@@ -10,3 +10,12 @@ quality:
 
 privacy:
   fail_on_exact_match: true
+
+input:
+  allowed_root: data/input
+  max_file_size_mb: 100
+  max_input_rows: 100000
+  max_output_rows: 100000
+  encoding: utf-8
+  allow_symlinks: false
+  reject_duplicate_columns: true

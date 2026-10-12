@@ -1,7 +1,14 @@
 import pandas as pd
 
 from synthetic_data.pipeline import run_pipeline
-
+from synthetic_data.config import (
+    GenerationConfig,
+    InputConfig,
+    OutputConfig,
+    PlatformConfig,
+    PrivacyConfig,
+    QualityConfig,
+)
 
 def test_pipeline_runs_end_to_end(tmp_path):
     input_file = tmp_path / "customers.csv"
@@ -44,9 +51,17 @@ def test_pipeline_runs_end_to_end(tmp_path):
 
     dataframe.to_csv(input_file, index=False)
 
+
     result = run_pipeline(
         file_path=input_file,
         row_count=20,
+        config=PlatformConfig(
+            generation=GenerationConfig(default_row_count=1000, ctgan_epochs=1),
+            output=OutputConfig(directory=tmp_path / "output"),
+            quality=QualityConfig(minimum_score=0.80),
+            privacy=PrivacyConfig(fail_on_exact_match=True),
+            input=InputConfig(allowed_root=tmp_path),
+        ),
     )
 
     synthetic = result.synthetic_dataframe
