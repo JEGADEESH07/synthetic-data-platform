@@ -1,7 +1,10 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 from uuid import uuid4
-from fastapi import FastAPI, HTTPException
+
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
+
 from synthetic_data.queue.job_queue import JobQueue
 from synthetic_data import __version__
 from synthetic_data.api.errors import (
@@ -20,6 +23,11 @@ from synthetic_data.api.schemas import (
     JobCreateRequest,
     JobCreateResponse,
     JobStatusResponse,
+)
+from synthetic_data.api.uploads import (
+    UploadValidationError,
+    save_uploaded_csv,
+    validate_uploaded_csv,
 )
 from synthetic_data.jobs.artifacts import (
     ArtifactManager,
@@ -75,7 +83,10 @@ app = FastAPI(
     description="V0.3 execution platform API.",
     lifespan=lifespan,
 )
+
 app.add_exception_handler(APIError, api_error_handler)
+
+
 @app.get("/api/v1/health")
 def health_check() -> dict[str, str]:
     return {"status": "healthy"}
@@ -114,6 +125,7 @@ def create_job(request: JobCreateRequest) -> JobCreateResponse:
             input_file=request.input_file,
             row_count=request.row_count,
         )
+
         job_service.queue_job(job_id)
         job_queue.enqueue(job_id)
 
@@ -139,6 +151,85 @@ def create_job(request: JobCreateRequest) -> JobCreateResponse:
         job_id=job.job_id,
         status=job.status,
     )
+
+
+@app.post(
+    "/api/v1/jobs/upload",
+    response_model=JobCreateResponse,
+    status_code=201,
+)
+async def create_job_from_upload(
+    file: UploadFile = File(...),
+    row_count: int = Form(...),
+) -> JobCreateResponse:
+    if row_count <= 0:
+        raise JobValidationAPIError(
+            "Row count must be greater than zero."
+        )
+
+    input_config = _get_input_config()
+
+    if row_count > input_config.max_output_rows:
+        raise JobValidationAPIError(
+            "Requested row count exceeds the configured maximum."
+        )
+
+    uploaded_path: Path | None = None
+
+    try:
+        uploaded_path = save_uploaded_csv(
+            file,
+            input_config,
+        )
+
+        validate_uploaded_csv(
+            uploaded_path,
+            input_config,
+        )
+
+        job_id = str(uuid4())
+
+        job = job_service.create_job(
+            job_id=job_id,
+            input_file=str(uploaded_path),
+            row_count=row_count,
+        )
+
+        job_queue.enqueue(job_id)
+
+        return JobCreateResponse(
+            job_id=job.job_id,
+            status=job.status,
+        )
+
+    except UploadValidationError as exc:
+        if uploaded_path is not None:
+            uploaded_path.unlink(missing_ok=True)
+
+        raise JobValidationAPIError(str(exc)) from exc
+
+    except Exception:
+        if uploaded_path is not None:
+            uploaded_path.unlink(missing_ok=True)
+
+        logger.exception("Failed to create job from uploaded file.")
+
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to process uploaded file.",
+        )
+
+def _get_input_config():
+    """
+    Return the platform input configuration.
+
+    H1.5 keeps the existing V0.3 configuration boundary while the
+    application configuration wiring is hardened in later H1 stages.
+    """
+
+    from synthetic_data.config.settings import InputConfig
+
+    return InputConfig()
 
 
 @app.get(
