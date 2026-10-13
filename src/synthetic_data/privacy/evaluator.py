@@ -185,12 +185,6 @@ def evaluate_privacy(
         detection.direct_identifiers
     )
 
-    if not protected_columns:
-        raise PrivacyEvaluationError(
-            "No protected identifier columns are available "
-            "for privacy evaluation"
-        )
-
     identifier_results = tuple(
         _evaluate_identifier_column(
             source_dataframe=source_dataframe,
@@ -215,7 +209,7 @@ def evaluate_privacy(
 
     if has_exact_matches:
         status = "FAIL"
-    elif has_duplicates:
+    elif not protected_columns or has_duplicates:
         status = "REVIEW_REQUIRED"
     else:
         status = "PASS"

@@ -38,16 +38,19 @@ def create_job_id() -> str:
     return f"job_{timestamp}_{unique_part}"
 
 
+
 def _build_report(
     job_id: str,
     synthetic_dataframe: pd.DataFrame,
     schema_result: SchemaValidationResult,
     privacy_report: PrivacyReport,
+    audit_metadata: dict | None = None,
 ) -> dict:
     """Build a JSON-serializable run report."""
 
     return {
         "job_id": job_id,
+        "audit": audit_metadata,
         "created_at": datetime.now(
             timezone.utc
         ).isoformat(),
@@ -108,14 +111,16 @@ def _build_report(
     }
 
 
+
 def persist_artifacts(
     synthetic_dataframe: pd.DataFrame,
     schema_result: SchemaValidationResult,
     privacy_report: PrivacyReport,
     output_root: str | Path = "data/output/jobs",
     job_id: str | None = None,
+    audit_metadata: dict | None = None,
 ) -> ArtifactPaths:
-    """Persist synthetic data and its evaluation report."""
+    """Persist generated artifacts to disk."""
 
     if not isinstance(
         synthetic_dataframe,
@@ -184,6 +189,7 @@ def persist_artifacts(
             synthetic_dataframe=synthetic_dataframe,
             schema_result=schema_result,
             privacy_report=privacy_report,
+            audit_metadata=audit_metadata,
         )
 
         report_path.write_text(

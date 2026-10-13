@@ -1,6 +1,9 @@
 from io import BytesIO
 from pathlib import Path
-
+import pytest
+from fastapi import UploadFile
+from synthetic_data.api.uploads import UploadValidationError, save_uploaded_csv
+from synthetic_data.config.settings import InputConfig
 from fastapi.testclient import TestClient
 
 from synthetic_data.api import app as app_module
@@ -153,3 +156,87 @@ def test_invalid_upload_does_not_create_job():
     )
 
     assert response.status_code == 400
+
+def test_oversized_upload_is_rejected_and_temporary_file_is_removed(
+    tmp_path,
+):
+    config = InputConfig(
+        allowed_root=tmp_path / "input",
+        max_file_size_mb=0,
+        max_input_rows=100,
+        max_output_rows=100,
+        encoding="utf-8",
+        allow_symlinks=False,
+        reject_duplicate_columns=True,
+    )
+
+    upload = UploadFile(
+        filename="oversized.csv",
+        file=BytesIO(b"id,value\n1,100\n"),
+    )
+
+    with pytest.raises(
+        UploadValidationError,
+        match="maximum allowed size",
+    ):
+        save_uploaded_csv(upload, config)
+
+    upload_directory = config.allowed_root / "uploads"
+
+    assert list(upload_directory.iterdir()) == []
+
+
+def test_api_rejects_oversized_upload_without_creating_job(
+    monkeypatch,
+    tmp_path,
+):
+    client = TestClient(app_module.app)
+
+    config = InputConfig(
+        allowed_root=tmp_path / "input",
+        max_file_size_mb=0,
+        max_input_rows=100,
+        max_output_rows=100,
+        encoding="utf-8",
+        allow_symlinks=False,
+        reject_duplicate_columns=True,
+    )
+
+    monkeypatch.setattr(
+        app_module,
+        "_get_input_config",
+        lambda: config,
+    )
+
+    create_job_calls = []
+    original_create_job = app_module.job_service.create_job
+
+
+    def track_create_job(*args, **kwargs):
+        create_job_calls.append(True)
+        return original_create_job(*args, **kwargs)
+
+
+    monkeypatch.setattr(
+        app_module.job_service,
+        "create_job",
+        track_create_job,
+    )
+
+    response = client.post(
+        "/api/v1/jobs/upload",
+        files={
+            "file": (
+                "oversized.csv",
+                BytesIO(b"id,value\n1,100\n"),
+                "text/csv",
+            )
+        },
+        data={"row_count": "10"},
+    )
+
+    assert response.status_code == 400
+    assert "maximum allowed size" in response.json()["message"].lower()
+    assert create_job_calls == []
+    upload_directory = config.allowed_root / "uploads"
+    assert list(upload_directory.iterdir()) == []

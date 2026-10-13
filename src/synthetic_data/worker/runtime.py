@@ -27,6 +27,36 @@ class Worker:
         self.executor = executor
         self.metrics = metrics or Metrics()
 
+
+    def _mark_failed_safely(
+        self,
+        job_id: str,
+        error_code: str,
+        error_message: str,
+    ) -> None:
+        """Attempt to persist job failure without crashing the worker loop."""
+        try:
+            self.job_service.mark_failed(
+                job_id,
+                error_code=error_code,
+                error_message=error_message,
+            )
+        except Exception:
+            logger.exception(
+                "Could not persist job failure state | "
+                "job_id=%s | error_code=%s",
+                job_id,
+                error_code,
+            )
+            return
+
+        logger.info(
+            "Job marked failed | job_id=%s | error_code=%s",
+            job_id,
+            error_code,
+        )
+
+
     def run_once(self) -> str | None:
         """Process one queued job and return its job ID."""
 
@@ -84,17 +114,10 @@ class Worker:
                 duration_seconds,
             )
 
-            self.job_service.mark_failed(
+            self._mark_failed_safely(
                 job_id,
                 error_code=exc.error_code,
                 error_message=str(exc),
-            )
-
-            logger.info(
-                "Job marked failed | "
-                "job_id=%s | error_code=%s",
-                job_id,
-                exc.error_code,
             )
 
         except Exception as exc:
@@ -110,16 +133,10 @@ class Worker:
                 duration_seconds,
             )
 
-            self.job_service.mark_failed(
+            self._mark_failed_safely(
                 job_id,
                 error_code="JOB_EXECUTION_FAILED",
                 error_message=str(exc),
-            )
-
-            logger.info(
-                "Job marked failed | "
-                "job_id=%s | error_code=JOB_EXECUTION_FAILED",
-                job_id,
             )
 
         finally:

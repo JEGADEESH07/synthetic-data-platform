@@ -1,12 +1,12 @@
 Metadata-Version: 2.4
 Name: synthetic-data-platform
-Version: 0.3.0
+Version: 0.3.1
 Summary: Synthetic data engineering and privacy evaluation platform
 Requires-Python: <3.13,>=3.12
 Description-Content-Type: text/markdown
 Requires-Dist: pandas<3.0,>=2.2
 Requires-Dist: numpy<3.0,>=2.0
-Requires-Dist: sdv<2.0,>=1.38
+Requires-Dist: sdv==1.38.5
 Requires-Dist: faker<38,>=37
 Requires-Dist: pydantic<3.0,>=2.0
 Requires-Dist: pyyaml<7.0,>=6.0
@@ -14,6 +14,7 @@ Requires-Dist: typer<1.0,>=0.16
 Requires-Dist: rich<15.0,>=14.0
 Requires-Dist: fastapi<1.0,>=0.115
 Requires-Dist: uvicorn<1.0,>=0.34
+Requires-Dist: python-multipart<1.0,>=0.0.20
 Provides-Extra: dev
 Requires-Dist: pytest<9.0,>=8.0; extra == "dev"
 Requires-Dist: pytest-cov<7.0,>=6.0; extra == "dev"

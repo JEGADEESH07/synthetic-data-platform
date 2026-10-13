@@ -88,3 +88,36 @@ def test_worker_returns_none_when_queue_is_empty(tmp_path):
     )
 
     assert worker.run_once() is None
+
+def test_worker_does_not_propagate_failure_transition_error():
+    from unittest.mock import Mock
+
+    from synthetic_data.queue.job_queue import JobQueue
+    from synthetic_data.worker.runtime import Worker
+
+    job_queue = JobQueue()
+    job_queue.enqueue("transition-error-job")
+
+    job_service = Mock()
+    job_service.mark_running.side_effect = RuntimeError(
+        "simulated running transition failure"
+    )
+    job_service.mark_failed.side_effect = RuntimeError(
+        "simulated failure persistence error"
+    )
+
+    worker = Worker(
+        job_queue=job_queue,
+        job_service=job_service,
+        executor=Mock(),
+    )
+
+    processed_job_id = worker.run_once()
+
+    assert processed_job_id == "transition-error-job"
+    job_service.mark_running.assert_called_once_with("transition-error-job")
+    job_service.mark_failed.assert_called_once_with(
+        "transition-error-job",
+        error_code="JOB_EXECUTION_FAILED",
+        error_message="simulated running transition failure",
+    )

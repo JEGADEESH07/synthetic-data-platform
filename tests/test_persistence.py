@@ -222,3 +222,34 @@ def test_existing_job_directory_is_rejected(
             output_root=tmp_path,
             job_id="job_duplicate",
         )
+
+
+def test_persisted_report_contains_audit_metadata(tmp_path):
+    """Persisted report should preserve supplied audit metadata."""
+
+    synthetic, schema_result, privacy_report = build_test_results()
+
+    audit_metadata = {
+        "engine": {
+            "engine_name": "V0.2 single-table synthesis engine",
+            "engine_version": "0.2.0",
+        },
+        "reproducibility": {
+            "seed": 42,
+        },
+    }
+
+    artifacts = persist_artifacts(
+        synthetic_dataframe=synthetic,
+        schema_result=schema_result,
+        privacy_report=privacy_report,
+        output_root=tmp_path,
+        job_id="job_test_audit",
+        audit_metadata=audit_metadata,
+    )
+
+    report = json.loads(
+        artifacts.report_path.read_text(encoding="utf-8")
+    )
+
+    assert report["audit"] == audit_metadata

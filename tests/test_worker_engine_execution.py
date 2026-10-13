@@ -1,6 +1,8 @@
+
+import json
 from pathlib import Path
 
-from synthetic_data.jobs.models import Job
+from synthetic_data.jobs.repository import JobRepository
 from synthetic_data.queue.job_queue import JobQueue
 from synthetic_data.worker.engine import V02Engine
 from synthetic_data.worker.executor import JobExecutionAdapter
@@ -22,7 +24,7 @@ class FakeRepository:
 
 
 def test_worker_executes_job_through_v02_engine(tmp_path):
-    repository = FakeRepository()
+    repository = JobRepository(tmp_path / "jobs.db")
 
     from synthetic_data.jobs.service import JobService
 
@@ -67,14 +69,40 @@ def test_worker_executes_job_through_v02_engine(tmp_path):
     assert Path(completed_job.synthetic_data_path).exists()
     assert Path(completed_job.report_path).exists()
 
-def test_worker_marks_job_failed_when_engine_fails():
+    # Verify audit metadata in the persisted report.
+    report = json.loads(
+        Path(completed_job.report_path).read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert isinstance(report["audit"], dict)
+    assert report["audit"]["engine"]["engine_version"] == "0.2.0"
+    assert report["audit"]["reproducibility"]["seed"] == 42
+    assert report["audit"]["dataset"]["source_dataset_fingerprint"]
+
+    # Verify execution metadata was recorded on the job.
+    assert completed_job.execution_metadata is not None
+    assert completed_job.execution_metadata["engine_version"] == "0.2.0"
+    assert completed_job.execution_metadata["seed"] == 42
+    assert completed_job.execution_metadata["generated_row_count"] == 10
+
+    # Re-read the job from SQLite to verify metadata persistence.
+    reloaded_job = job_service.get_job(job.job_id)
+
+    assert reloaded_job is not None
+    assert reloaded_job.execution_metadata == completed_job.execution_metadata
+
+
+
+def test_worker_marks_job_failed_when_engine_fails(tmp_path):
     from synthetic_data.jobs.service import JobService
 
     class FailingEngine:
         def execute(self, job_id, input_file, row_count):
             raise RuntimeError("simulated engine failure")
 
-    repository = FakeRepository()
+    repository = JobRepository(tmp_path / "failure-jobs.db")
     job_service = JobService(repository)
 
     job = job_service.create_job(
@@ -108,3 +136,13 @@ def test_worker_marks_job_failed_when_engine_fails():
     assert failed_job is not None
     assert failed_job.status.value == "FAILED"
     assert failed_job.error_code == "JOB_EXECUTION_FAILED"
+    assert failed_job.synthetic_data_path is None
+    assert failed_job.report_path is None
+
+    # The failure state must survive a read from SQLite.
+    reloaded_job = job_service.get_job(job.job_id)
+
+    assert reloaded_job is not None
+    assert reloaded_job.status.value == "FAILED"
+    assert reloaded_job.error_code == "JOB_EXECUTION_FAILED"
+    assert reloaded_job.error_message is not None

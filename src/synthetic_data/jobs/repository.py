@@ -1,3 +1,5 @@
+import json
+
 import sqlite3
 from datetime import datetime
 
@@ -36,7 +38,8 @@ class JobRepository:
                     synthetic_data_path TEXT,
                     report_path TEXT,
                     error_code TEXT,
-                    error_message TEXT
+                    error_message TEXT,
+                    execution_metadata_json TEXT
                 )
                 """
             )
@@ -50,6 +53,7 @@ class JobRepository:
                 ("progress", "INTEGER"),
                 ("completed_units", "INTEGER"),
                 ("total_units", "INTEGER"),
+                ("execution_metadata_json", "TEXT"),
             ):
                 if name not in existing_columns:
                     connection.execute(
@@ -77,9 +81,10 @@ class JobRepository:
                     synthetic_data_path,
                     report_path,
                     error_code,
-                    error_message
+                    error_message,
+                    execution_metadata_json
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     job.job_id,
@@ -98,6 +103,7 @@ class JobRepository:
                     job.report_path,
                     job.error_code,
                     job.error_message,
+                    json.dumps(job.execution_metadata) if job.execution_metadata is not None else None,
                 ),
             )
             connection.commit()
@@ -113,6 +119,18 @@ class JobRepository:
             return None
 
         return self._row_to_job(row)
+
+
+    def list_by_status(self, status: JobStatus) -> list[Job]:
+        """Return persisted jobs matching a lifecycle status."""
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM jobs WHERE status = ? ORDER BY created_at, job_id",
+                (status.value,),
+            ).fetchall()
+
+        return [self._row_to_job(row) for row in rows]
+
 
     def update(self, job: Job) -> None:
         with self._connect() as connection:
@@ -134,7 +152,8 @@ class JobRepository:
                     synthetic_data_path = ?,
                     report_path = ?,
                     error_code = ?,
-                    error_message = ?
+                    error_message = ?,
+                    execution_metadata_json = ?
                 WHERE job_id = ?
                 """,
                 (
@@ -153,6 +172,7 @@ class JobRepository:
                     job.report_path,
                     job.error_code,
                     job.error_message,
+                    json.dumps(job.execution_metadata) if job.execution_metadata is not None else None,
                     job.job_id,
                 ),
             )
@@ -189,4 +209,5 @@ class JobRepository:
             report_path=row["report_path"],
             error_code=row["error_code"],
             error_message=row["error_message"],
+            execution_metadata=json.loads(row["execution_metadata_json"]) if row["execution_metadata_json"] is not None else None
         )

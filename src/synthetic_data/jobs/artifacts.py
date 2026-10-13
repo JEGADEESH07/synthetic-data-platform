@@ -23,7 +23,16 @@ class ArtifactManager:
         self.output_root = Path(output_root)
 
     def get_artifacts(self, job_id: str) -> JobArtifacts:
-        output_directory = self.output_root / job_id
+        output_root = self.output_root.resolve()
+        output_directory = (output_root / job_id).resolve()
+
+        # Reject job paths that escape the configured output root.
+        try:
+            output_directory.relative_to(output_root)
+        except ValueError:
+            raise ArtifactNotFoundError(
+                "Artifacts not found for the requested job."
+            ) from None
 
         if not output_directory.is_dir():
             raise ArtifactNotFoundError(
@@ -32,6 +41,15 @@ class ArtifactManager:
 
         synthetic_data_path = output_directory / "synthetic_data.csv"
         report_path = output_directory / "report.json"
+
+        # Reject artifact symlinks that point outside the job directory.
+        for artifact_path in (synthetic_data_path, report_path):
+            try:
+                artifact_path.resolve().relative_to(output_directory)
+            except ValueError:
+                raise ArtifactNotFoundError(
+                    "Artifacts not found for the requested job."
+                ) from None
 
         if not synthetic_data_path.is_file():
             raise ArtifactNotFoundError(

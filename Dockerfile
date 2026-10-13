@@ -18,9 +18,7 @@ RUN pip install --no-cache-dir \
 # Install the platform and its remaining dependencies.
 RUN pip install --no-cache-dir .
 
-COPY data/input ./data/input
-
-RUN mkdir -p data/output/jobs
+RUN mkdir -p data/input data/output/jobs
 
 EXPOSE 8000
 

@@ -36,7 +36,8 @@ def test_engine_executes_v02_pipeline(monkeypatch, tmp_path):
 
     monkeypatch.setattr(
         "synthetic_data.worker.engine.run_pipeline",
-        lambda file_path, row_count: FakeResult(),
+        lambda file_path, row_count, config=None: FakeResult(),
+
     )
 
     monkeypatch.setattr(

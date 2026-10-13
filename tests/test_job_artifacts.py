@@ -130,3 +130,22 @@ def test_persist_artifacts_cleans_partial_output_on_failure(
         )
 
     assert not (output_root / "cleanup-test").exists()
+
+def test_job_id_cannot_escape_output_root(tmp_path):
+    output_root = tmp_path / "jobs"
+    outside_directory = tmp_path / "outside"
+    outside_directory.mkdir()
+
+    (outside_directory / "synthetic_data.csv").write_text(
+        "id,value\n1,100\n",
+        encoding="utf-8",
+    )
+    (outside_directory / "report.json").write_text(
+        '{"status": "PASS"}',
+        encoding="utf-8",
+    )
+
+    manager = ArtifactManager(output_root)
+
+    with pytest.raises(ArtifactNotFoundError):
+        manager.get_artifacts("../outside")

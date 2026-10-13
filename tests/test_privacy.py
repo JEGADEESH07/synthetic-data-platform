@@ -466,3 +466,36 @@ def test_invalid_detection_type_raises_error():
             synthetic_dataframe=synthetic,
             detection=None,
         )
+
+
+def test_no_protected_identifiers_requires_review():
+    """Datasets without protected identifiers must not pass privacy review."""
+
+    source = pd.DataFrame(
+        {
+            "Age": [24, 31, 28, 35],
+            "City": ["Chennai", "Madurai", "Trichy", "Salem"],
+            "Amount": [1200, 2400, 1800, 3200],
+        }
+    )
+
+    synthetic = pd.DataFrame(
+        {
+            "Age": [25, 32, 29, 36],
+            "City": ["Coimbatore", "Chennai", "Salem", "Madurai"],
+            "Amount": [1300, 2500, 1900, 3300],
+        }
+    )
+
+    detection = build_detection(source)
+    assert not detection.direct_identifiers
+
+    report = evaluate_privacy(
+        source_dataframe=source,
+        synthetic_dataframe=synthetic,
+        detection=detection,
+    )
+
+    assert report.status == "REVIEW_REQUIRED"
+    assert report.identifier_results == ()
+    assert report.total_exact_matches == 0

@@ -1,6 +1,7 @@
 ﻿import pandas as pd
 import pytest
-
+from pandas.testing import assert_frame_equal
+from synthetic_data.config import GenerationConfig
 from synthetic_data.generation import (
     GenerationResult,
     SyntheticGenerationError,
@@ -143,3 +144,126 @@ def test_missing_policy_column_raises_error() -> None:
             policy=policy,
             row_count=10,
         )
+
+
+def test_same_seed_repeats_actual_synthetic_generation():
+    """Check whether independent CTGAN runs repeat with the same seed."""
+    dataframe = pd.DataFrame(
+        {
+            "Age": list(range(20, 40)),
+            "City": ["Chennai", "Madurai", "Trichy", "Salem"] * 5,
+            "Amount": [100.0 + index * 10 for index in range(20)],
+        }
+    )
+
+    detection = detect_identifiers(dataframe)
+    policy = build_metadata_policy(dataframe, detection)
+
+    config = GenerationConfig(
+        default_row_count=10,
+        ctgan_epochs=2,
+        seed=42,
+    )
+
+    first = generate_synthetic_data(
+        dataframe=dataframe,
+        policy=policy,
+        row_count=10,
+        config=config,
+    )
+
+    second = generate_synthetic_data(
+        dataframe=dataframe,
+        policy=policy,
+        row_count=10,
+        config=config,
+    )
+
+    assert_frame_equal(
+        first.dataframe.reset_index(drop=True),
+        second.dataframe.reset_index(drop=True),
+        check_exact=True,
+    )
+
+
+@pytest.mark.parametrize(
+    ("dataframe", "expected_columns"),
+    [
+        pytest.param(
+            pd.DataFrame(
+                {
+                    "Age": [20, 25, 30, 35, 40, 45],
+                    "Income": [20000, 25000, 30000, 35000, 40000, 45000],
+                }
+            ),
+            {"Age", "Income"},
+            id="numerical-only",
+        ),
+        pytest.param(
+            pd.DataFrame(
+                {
+                    "City": [
+                        "Chennai",
+                        "Madurai",
+                        "Salem",
+                        "Trichy",
+                        "Chennai",
+                        "Madurai",
+                    ],
+                    "Department": [
+                        "Sales",
+                        "Engineering",
+                        "HR",
+                        "Sales",
+                        "Engineering",
+                        "HR",
+                    ],
+                }
+            ),
+            {"City", "Department"},
+            id="categorical-only",
+        ),
+        pytest.param(
+            pd.DataFrame(
+                {
+                    "Age": [20, 25, 30, 35, 40, 45],
+                    "City": [
+                        "Chennai",
+                        "Madurai",
+                        "Salem",
+                        "Trichy",
+                        "Chennai",
+                        "Madurai",
+                    ],
+                    "Active": [True, False, True, False, True, False],
+                }
+            ),
+            {"Age", "City", "Active"},
+            id="mixed-with-boolean",
+        ),
+    ],
+)
+def test_generation_supports_diverse_dataset_shapes(
+    dataframe: pd.DataFrame,
+    expected_columns: set[str],
+) -> None:
+    """Generation should handle supported numerical and categorical shapes."""
+    detection = detect_identifiers(dataframe)
+    policy = build_metadata_policy(dataframe, detection)
+
+    config = GenerationConfig(
+        default_row_count=5,
+        ctgan_epochs=2,
+        seed=42,
+    )
+
+    result = generate_synthetic_data(
+        dataframe=dataframe,
+        policy=policy,
+        row_count=5,
+        config=config,
+    )
+
+    assert result.row_count == 5
+    assert len(result.dataframe) == 5
+    assert set(result.dataframe.columns) == expected_columns

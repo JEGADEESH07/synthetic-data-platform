@@ -1,6 +1,6 @@
 ﻿# Synthetic Data Engineering & Privacy Platform
 
-**V0.3 — Execution Platform**
+**V0.3.1 — Execution Platform**
 
 A modular synthetic data engineering and privacy evaluation platform designed
 to generate useful synthetic datasets while evaluating schema integrity,
@@ -55,7 +55,7 @@ V0.3 provides the execution platform around it:
 - Job-oriented logging
 - Dockerized runtime
 API
-The V0.3 API is available under:
+The V0.3.1 API is available under:
 /api/v1/
 
 Health
@@ -66,10 +66,20 @@ Version
 GET /api/v1/version
 
 Returns the platform version.
+
+Readiness
+GET /api/v1/readiness
+
+Returns the service readiness status.
+
+Upload Job
+POST /api/v1/jobs/upload
+
+Accepts a multipart CSV upload and requested row count.
 Create Job
 POST /api/v1/jobs
 
-Creates and queues a synthetic-data generation job.
+Creates and queues a synthetic-data generation job from a server-accessible CSV path.
 Request:
 {
   "input_file": "data/input/dev_dataset.csv",
@@ -153,8 +163,9 @@ scripts/
 Testing
 The V0.3 platform has an automated regression suite covering the V0.2
 engine and V0.3 execution platform.
-Current verified regression result:
-131 passed
+Latest verified regression result:
+242 passed, 1 skipped, 24 warnings; 89% coverage.
+The Windows symlink test was skipped because symlink creation was unavailable in that environment.
 
 The suite covers:
 - API endpoints
@@ -169,22 +180,21 @@ The suite covers:
 - End-to-end API-to-engine execution
 - Existing V0.2 functionality
 Docker
-V0.3 can be run as a Dockerized FastAPI service.
+V0.3.1 can be run as a Dockerized FastAPI service.
 Build:
-docker build -t synthetic-data-platform:v0.3 .
+docker build -t synthetic-data-platform:v0.3.1 .
 
 Run:
 docker run -d `
-  --name sdp-v03 `
+  --name sdp-v031 `
   -p 8000:8000 `
   -v sdp_v03_data:/app/data/output/jobs `
-  synthetic-data-platform:v0.3
+  synthetic-data-platform:v0.3.1
 
 Health check:
 GET http://localhost:8000/api/v1/health
 
-The named Docker volume keeps job metadata and generated artifacts
-persistent across container recreation.
+The named volume mounts the job output directory. Job metadata persistence depends on the configured SQLite database path.
 Documentation
 Architecture:
 docs/V0.3_ARCHITECTURE.md

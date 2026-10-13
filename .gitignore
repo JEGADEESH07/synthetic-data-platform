@@ -2,7 +2,7 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
-.coverage
+.coverage*
 htmlcov/
 .env
 .env.*
@@ -11,3 +11,5 @@ data/output/
 *.log
 .vscode/
 .idea/
+data/input/*
+!data/input/.gitkeep

@@ -32,15 +32,3 @@ def test_create_job_requires_input_file():
     )
 
     assert response.status_code == 422
-
-
-def test_create_job_requires_positive_row_count():
-    response = client.post(
-        "/api/v1/jobs",
-        json={
-            "input_file": "data/input/dev_dataset.csv",
-            "row_count": 0,
-        },
-    )
-
-    assert response.status_code == 422

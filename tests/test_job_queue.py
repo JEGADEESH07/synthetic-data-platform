@@ -40,3 +40,26 @@ def test_queue_size():
     queue.dequeue()
 
     assert queue.size() == 1
+
+
+def test_duplicate_enqueue_does_not_add_job_twice():
+    queue = JobQueue()
+
+    queue.enqueue("job-001")
+    queue.enqueue("job-001")
+
+    assert queue.size() == 1
+    assert queue.dequeue() == "job-001"
+    assert queue.dequeue() is None
+
+
+def test_dequeued_job_can_be_enqueued_again():
+    queue = JobQueue()
+
+    queue.enqueue("job-001")
+    assert queue.dequeue() == "job-001"
+
+    queue.enqueue("job-001")
+
+    assert queue.size() == 1
+    assert queue.dequeue() == "job-001"

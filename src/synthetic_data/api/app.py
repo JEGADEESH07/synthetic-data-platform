@@ -74,8 +74,8 @@ background_worker = BackgroundWorker(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    recover_queued_jobs()
     background_worker.start()
-
     try:
         yield
     finally:
@@ -93,21 +93,73 @@ app = FastAPI(
 )
 
 app.add_exception_handler(APIError, api_error_handler)
-
-app.add_exception_handler(
-    HTTPException,
-    http_exception_handler,
-)
-
+app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(
     RequestValidationError,
     validation_exception_handler,
 )
+app.add_exception_handler(Exception, unexpected_exception_handler)
 
-app.add_exception_handler(
-    Exception,
-    unexpected_exception_handler,
-)
+
+
+def recover_queued_jobs() -> None:
+    """Recover queued jobs and fail jobs interrupted by a previous process."""
+    try:
+        queued_jobs = job_service.list_queued_jobs()
+    except Exception:
+        logger.exception("Could not list queued jobs during startup recovery")
+        queued_jobs = []
+
+    for job in queued_jobs:
+        try:
+            input_path = Path(job.input_file)
+            if not input_path.is_file():
+                job_service.mark_failed(
+                    job.job_id,
+                    error_code="INPUT_FILE_MISSING",
+                    error_message="The queued job's input file is missing.",
+                )
+                logger.warning(
+                    "Queued job cannot be recovered because its input file is missing",
+                    extra={"job_id": job.job_id},
+                )
+                continue
+
+            job_queue.enqueue(job.job_id)
+            logger.info("Recovered queued job", extra={"job_id": job.job_id})
+        except Exception:
+            logger.exception(
+                "Could not recover queued job during startup",
+                extra={"job_id": job.job_id},
+            )
+
+    try:
+        running_jobs = job_service.list_running_jobs()
+    except Exception:
+        logger.exception("Could not list running jobs during startup recovery")
+        return
+
+    for job in running_jobs:
+        try:
+            job_service.mark_failed(
+                job.job_id,
+                error_code="STALE_JOB",
+                error_message=(
+                    "Job execution was interrupted by a previous application process. "
+                    "Submit a new job to retry."
+                ),
+            )
+            logger.warning(
+                "Interrupted running job marked as failed during startup recovery",
+                extra={"job_id": job.job_id},
+            )
+        except Exception:
+            logger.exception(
+                "Could not recover interrupted running job",
+                extra={"job_id": job.job_id},
+            )
+
+
 
 @app.middleware("http")
 async def request_id_middleware(request: Request, call_next):
@@ -272,6 +324,7 @@ async def create_job_from_upload(
             row_count=row_count,
             input_columns=input_columns,
         )
+        job_service.queue_job(job_id)
         metrics.increment_jobs_created()
         job_queue.enqueue(job_id)
 
@@ -370,6 +423,7 @@ def get_job_status(job_id: str) -> JobStatusResponse:
         progress=job.progress,
         completed_units=job.completed_units,
         total_units=job.total_units,
+        execution_metadata=job.execution_metadata,
         synthetic_data_path=job.synthetic_data_path,
         report_path=job.report_path,
         error_code=job.error_code,

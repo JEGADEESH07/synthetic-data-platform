@@ -17,7 +17,7 @@ def test_openapi_document_is_available():
         "Synthetic Data Engineering & Privacy Platform"
     )
 
-    assert document["info"]["version"] == "0.3.0"
+    assert document["info"]["version"] == "0.3.1"
 
 
 def test_openapi_contains_expected_api_routes():

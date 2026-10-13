@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 
 from synthetic_data.api.app import app
@@ -18,28 +19,19 @@ def test_missing_input_file_is_rejected():
     assert response.status_code == 422
 
 
-def test_zero_row_count_is_rejected():
+
+@pytest.mark.parametrize("row_count", [0, -10])
+def test_invalid_row_count_is_rejected(row_count):
     response = client.post(
         "/api/v1/jobs",
         json={
             "input_file": "data/input/dev_dataset.csv",
-            "row_count": 0,
+            "row_count": row_count,
         },
     )
 
     assert response.status_code == 422
 
-
-def test_negative_row_count_is_rejected():
-    response = client.post(
-        "/api/v1/jobs",
-        json={
-            "input_file": "data/input/dev_dataset.csv",
-            "row_count": -10,
-        },
-    )
-
-    assert response.status_code == 422
 
 
 def test_non_csv_file_is_rejected():

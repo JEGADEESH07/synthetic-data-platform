@@ -461,3 +461,43 @@ def test_invalid_policy_type_raises_error():
             synthetic_dataframe=synthetic,
             policy=None,
         )
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        # Numerical columns
+        pd.DataFrame({"Age": [18, 25, 40, 65]}),
+        # Categorical column with several distinct values
+        pd.DataFrame({"City": ["Chennai", "Madurai", "Salem", "Trichy"]}),
+        # Boolean column
+        pd.DataFrame({"Active": [True, False, True, False]}),
+        # Mixed numerical, categorical, and boolean columns
+        pd.DataFrame(
+            {
+                "Age": [18, 25, 40, 65],
+                "City": ["Chennai", "Madurai", "Salem", "Trichy"],
+                "Active": [True, False, True, False],
+            }
+        ),
+    ],
+    ids=[
+        "numerical-only",
+        "categorical-only",
+        "boolean-only",
+        "mixed-columns",
+    ],
+)
+def test_identical_data_quality_across_dataset_shapes(source):
+    """Identical source and synthetic data should score perfectly."""
+    synthetic = source.copy()
+    policy = build_policy(source)
+
+    report = evaluate_statistical_quality(
+        source_dataframe=source,
+        synthetic_dataframe=synthetic,
+        policy=policy,
+    )
+
+    assert report.overall_score == pytest.approx(1.0)
+    assert report.failed_columns == ()

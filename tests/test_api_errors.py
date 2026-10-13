@@ -121,13 +121,21 @@ def test_schema_validation_returns_consistent_error():
     assert response.headers["X-Request-ID"] == request_id
 
 
+
 def test_error_does_not_expose_internal_details():
     response = client.get(
         "/api/v1/jobs/does-not-exist",
     )
 
     body = response.json()
+    response_text = response.text.lower()
 
     assert "traceback" not in body
     assert "exception" not in body
     assert "stack" not in body
+
+    assert "traceback" not in response_text
+    assert "runtimeerror" not in response_text
+    assert "file not found" not in response_text
+    assert "c:\\users\\" not in response_text
+    assert "/home/" not in response_text

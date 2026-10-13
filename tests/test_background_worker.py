@@ -124,3 +124,20 @@ def test_background_worker_stops_cleanly():
     background_worker.stop()
 
     assert background_worker._thread is None
+
+
+def test_background_worker_preserves_thread_reference_if_shutdown_times_out():
+    from unittest.mock import Mock
+
+    from synthetic_data.worker.background import BackgroundWorker
+
+    background_worker = BackgroundWorker(worker=Mock())
+    thread = Mock()
+    thread.is_alive.return_value = True
+    background_worker._thread = thread
+
+    background_worker.stop()
+
+    thread.join.assert_called_once_with(timeout=5)
+    assert background_worker._thread is thread
+    assert background_worker._stop_event.is_set()

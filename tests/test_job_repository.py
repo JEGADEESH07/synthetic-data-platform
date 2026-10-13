@@ -168,3 +168,61 @@ def test_repository_persists_failure_information(tmp_path):
     assert stored_job.status == JobStatus.FAILED
     assert stored_job.error_code == "GENERATION_FAILED"
     assert stored_job.error_message == "Generation failed."
+
+def test_repository_persists_execution_metadata(tmp_path):
+    repository = JobRepository(str(tmp_path / "jobs.db"))
+    job = create_job()
+
+    job.execution_metadata = {
+        "schema_version": "1.0",
+        "engine": {"name": "V0.2", "version": "0.2.0"},
+        "seed": 42,
+    }
+
+    repository.create(job)
+    stored_job = repository.get(job.job_id)
+
+    assert stored_job is not None
+    assert stored_job.execution_metadata == job.execution_metadata
+
+
+def test_repository_updates_execution_metadata(tmp_path):
+    repository = JobRepository(str(tmp_path / "jobs.db"))
+    job = create_job()
+    repository.create(job)
+
+    job.execution_metadata = {"seed": 123, "outcome": "SUCCEEDED"}
+    repository.update(job)
+
+    stored_job = repository.get(job.job_id)
+
+    assert stored_job is not None
+    assert stored_job.execution_metadata == job.execution_metadata
+
+
+def test_repository_preserves_missing_execution_metadata(tmp_path):
+    repository = JobRepository(str(tmp_path / "jobs.db"))
+    job = create_job()
+
+    repository.create(job)
+    stored_job = repository.get(job.job_id)
+
+    assert stored_job is not None
+    assert stored_job.execution_metadata is None
+
+
+def test_repository_lists_jobs_by_status(tmp_path):
+    repository = JobRepository(str(tmp_path / "jobs.db"))
+
+    queued_job = create_job("queued-job")
+    queued_job.status = JobStatus.QUEUED
+    repository.create(queued_job)
+
+    running_job = create_job("running-job")
+    running_job.status = JobStatus.RUNNING
+    repository.create(running_job)
+
+    queued_jobs = repository.list_by_status(JobStatus.QUEUED)
+
+    assert [job.job_id for job in queued_jobs] == ["queued-job"]
+    assert queued_jobs[0].status == JobStatus.QUEUED

@@ -1,5 +1,8 @@
 ﻿"""CTGAN-based synthetic data generation."""
+import random
 
+import numpy as np
+import torch
 from dataclasses import dataclass
 from synthetic_data.config import GenerationConfig
 import pandas as pd
@@ -7,6 +10,27 @@ from sdv.metadata import SingleTableMetadata
 from sdv.single_table import CTGANSynthesizer
 
 from synthetic_data.metadata import MetadataPolicy
+
+
+from contextlib import contextmanager
+
+
+@contextmanager
+def _seeded_training_context(seed: int):
+    """Temporarily seed RNGs for reproducible CPU training."""
+    python_state = random.getstate()
+    numpy_state = np.random.get_state()
+    torch_state = torch.random.get_rng_state()
+
+    try:
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+        yield
+    finally:
+        random.setstate(python_state)
+        np.random.set_state(numpy_state)
+        torch.random.set_rng_state(torch_state)
 
 
 class SyntheticGenerationError(Exception):
@@ -114,7 +138,10 @@ def generate_synthetic_data(
             verbose=False,
         )
 
-        synthesizer.fit(training_data)
+        with _seeded_training_context(generation_config.seed):
+            synthesizer.fit(training_data)
+
+        synthesizer._set_random_state(generation_config.seed)
 
         synthetic_data = synthesizer.sample(
             num_rows=row_count

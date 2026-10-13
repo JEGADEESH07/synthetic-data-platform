@@ -36,26 +36,25 @@ def test_build_metadata_policy() -> None:
     )
 
 
-def test_column_types() -> None:
-    """Metadata should identify generation-relevant column types."""
 
-    dataframe = pd.DataFrame(
-        {
-            "Age": [20, 30, 40],
-            "City": ["Chennai", "Madurai", "Chennai"],
-            "Active": [True, False, True],
-        }
-    )
+@pytest.mark.parametrize(
+    ("column_name", "values", "expected_type"),
+    [
+        ("Age", [20, 30, 40], "numerical"),
+        ("City", ["Chennai", "Madurai", "Chennai"], "categorical"),
+        ("Active", [True, False, True], "boolean"),
+    ],
+)
+def test_column_types(column_name, values, expected_type):
+    """Metadata should classify supported column types correctly."""
+    dataframe = pd.DataFrame({column_name: values})
 
     detection = detect_identifiers(dataframe)
     policy = build_metadata_policy(dataframe, detection)
 
     columns = {column.name: column for column in policy.columns}
 
-    assert isinstance(columns["Age"], ColumnPolicy)
-    assert columns["Age"].column_type == "numerical"
-    assert columns["City"].column_type == "categorical"
-    assert columns["Active"].column_type == "boolean"
+    assert columns[column_name].column_type == expected_type
 
 
 def test_nullable_columns_are_detected() -> None:

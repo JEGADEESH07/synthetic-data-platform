@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from synthetic_data.jobs.models import Job, JobStatus
 from synthetic_data.jobs.repository import JobRepository
+import json
 
 class JobFailureCode:
     """Stable failure categories for job execution."""
@@ -39,6 +40,42 @@ class JobService:
     def get_job(self, job_id: str) -> Job | None:
         """Return a job by ID, or None when it does not exist."""
         return self.repository.get(job_id)
+
+
+    def list_queued_jobs(self) -> list[Job]:
+        """Return persisted jobs waiting to be executed."""
+        return self.repository.list_by_status(JobStatus.QUEUED)
+
+    def list_running_jobs(self) -> list[Job]:
+        """Return persisted jobs currently marked as running."""
+        return self.repository.list_by_status(JobStatus.RUNNING)
+
+    def set_execution_metadata(
+        self,
+        job_id: str,
+        execution_metadata: dict,
+    ) -> Job:
+        """Persist JSON-compatible execution metadata for a running job."""
+        job = self._require_job(job_id)
+        self._require_status(job, JobStatus.RUNNING)
+
+        if not isinstance(execution_metadata, dict):
+            raise ValueError("Execution metadata must be a dictionary.")
+
+        try:
+            # Round-trip to validate JSON compatibility and detach the data.
+            normalized_metadata = json.loads(
+                json.dumps(execution_metadata)
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "Execution metadata must contain JSON-compatible values."
+            ) from exc
+
+        job.execution_metadata = normalized_metadata
+        self.repository.update(job)
+        return job
+
 
     def queue_job(self, job_id: str) -> Job:
         """Move a job from CREATED to QUEUED."""

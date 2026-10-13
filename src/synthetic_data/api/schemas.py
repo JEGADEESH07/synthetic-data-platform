@@ -1,3 +1,4 @@
+
 from pydantic import BaseModel, Field
 
 from synthetic_data.jobs.models import JobStatus
@@ -11,6 +12,7 @@ class JobCreateRequest(BaseModel):
 class JobCreateResponse(BaseModel):
     job_id: str
     status: JobStatus
+
 
 class JobStatusResponse(BaseModel):
     job_id: str
@@ -29,15 +31,20 @@ class JobStatusResponse(BaseModel):
     completed_units: int | None
     total_units: int | None
 
+    # H4: concise execution and reproducibility metadata.
+    execution_metadata: dict | None = None
+
     synthetic_data_path: str | None
     report_path: str | None
 
     error_code: str | None
     error_message: str | None
 
+
 class ArtifactListResponse(BaseModel):
     job_id: str
     artifacts: list[str]
+
 
 class ErrorResponse(BaseModel):
     error_code: str

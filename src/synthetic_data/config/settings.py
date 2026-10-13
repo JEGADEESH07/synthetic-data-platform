@@ -14,6 +14,7 @@ class GenerationConfig:
 
     default_row_count: int = 1000
     ctgan_epochs: int = 10
+    seed: int = 42
 
 
 @dataclass(frozen=True)
@@ -77,6 +78,19 @@ def _validate_positive_integer(
             f"{name} must be greater than zero"
         )
 
+def _validate_non_negative_integer(
+    value: int,
+    name: str,
+)-> None:
+    """Validate a non-negative integer configuration value."""
+
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ConfigurationError(f"{name} must be an integer")
+
+    if value < 0:
+        raise ConfigurationError(
+            f"{name} must be greater than or equal to zero"
+        )
 
 def _validate_score(
     value: float,
@@ -171,20 +185,24 @@ def load_config(
             "input.encoding must not be empty"
         )
 
+
+    raw_seed = generation_raw.get("seed", 42)
+
+    _validate_non_negative_integer(
+        raw_seed,
+        "generation.seed",
+    )
+
     generation = GenerationConfig(
         default_row_count=int(
-            generation_raw.get(
-                "default_row_count",
-                1000,
-            )
+            generation_raw.get("default_row_count", 1000)
         ),
         ctgan_epochs=int(
-            generation_raw.get(
-                "ctgan_epochs",
-                10,
-            )
+            generation_raw.get("ctgan_epochs", 10)
         ),
+        seed=raw_seed,
     )
+
 
     output = OutputConfig(
         directory=Path(
@@ -276,6 +294,11 @@ def load_config(
     _validate_score(
         quality.minimum_score,
         "quality.minimum_score",
+    )
+
+    _validate_non_negative_integer(
+        generation.seed,
+        "generation.seed",
     )
 
     return PlatformConfig(

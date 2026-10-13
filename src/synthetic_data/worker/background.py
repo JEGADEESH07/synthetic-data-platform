@@ -41,17 +41,29 @@ class BackgroundWorker:
 
         logger.info("Background worker started")
 
+
     def stop(self) -> None:
         """Stop the background worker thread."""
 
         self._stop_event.set()
 
-        if self._thread is not None:
-            self._thread.join(timeout=5)
+        thread = self._thread
+        if thread is None:
+            logger.info("Background worker is already stopped")
+            return
+
+        thread.join(timeout=5)
+
+        if thread.is_alive():
+            logger.warning(
+                "Background worker did not stop within the timeout; "
+                "keeping its thread reference"
+            )
+            return
 
         self._thread = None
-
         logger.info("Background worker stopped")
+
 
     def _run(self) -> None:
         """Continuously process queued jobs until shutdown."""

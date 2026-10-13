@@ -99,24 +99,35 @@ quality:
         load_config(config_file)
 
 
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("default_row_count", 0),
+        ("default_row_count", -1),
+        ("ctgan_epochs", 0),
+        ("ctgan_epochs", -1),
+    ],
+)
 def test_invalid_generation_values_are_rejected(
     tmp_path,
+    field,
+    value,
 ):
-    """Generation values must be positive."""
-
     config_file = tmp_path / "invalid.yaml"
-
     config_file.write_text(
-        """
+        f"""
 generation:
-  default_row_count: 0
+  default_row_count: 1000
   ctgan_epochs: 10
+  {field}: {value}
 """,
         encoding="utf-8",
     )
 
     with pytest.raises(ConfigurationError):
         load_config(config_file)
+
 
 @pytest.mark.parametrize(
     ("field", "value"),

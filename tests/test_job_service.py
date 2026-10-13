@@ -193,3 +193,74 @@ def test_unknown_job_returns_none(tmp_path):
     service = create_service(tmp_path)
 
     assert service.get_job("does-not-exist") is None
+
+
+def test_set_execution_metadata_persists_for_running_job(tmp_path):
+    service = create_service(tmp_path)
+
+    job = service.create_job(
+        job_id="audit-job",
+        input_file="data/input.csv",
+        row_count=100,
+    )
+    service.queue_job(job.job_id)
+    service.mark_running(job.job_id)
+
+    metadata = {
+        "engine_version": "0.2.0",
+        "seed": 42,
+        "generated_row_count": 100,
+    }
+
+    updated = service.set_execution_metadata(
+        job.job_id,
+        metadata,
+    )
+
+    assert updated.execution_metadata == metadata
+
+    stored = service.get_job(job.job_id)
+    assert stored is not None
+    assert stored.execution_metadata == metadata
+
+
+def test_set_execution_metadata_rejects_non_dictionary(tmp_path):
+    service = create_service(tmp_path)
+
+    job = service.create_job(
+        job_id="invalid-audit-job",
+        input_file="data/input.csv",
+        row_count=100,
+    )
+    service.queue_job(job.job_id)
+    service.mark_running(job.job_id)
+
+    with pytest.raises(
+        ValueError,
+        match="Execution metadata must be a dictionary",
+    ):
+        service.set_execution_metadata(
+            job.job_id,
+            ["not", "a", "dictionary"],
+        )
+
+
+def test_list_queued_jobs_returns_only_queued_jobs(tmp_path):
+    service = create_service(tmp_path)
+
+    queued = service.create_job(
+        job_id="queued-job",
+        input_file="data/input.csv",
+        row_count=10,
+    )
+    service.queue_job(queued.job_id)
+
+    service.create_job(
+        job_id="created-job",
+        input_file="data/input.csv",
+        row_count=10,
+    )
+
+    jobs = service.list_queued_jobs()
+
+    assert [job.job_id for job in jobs] == ["queued-job"]

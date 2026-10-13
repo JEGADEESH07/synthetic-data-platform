@@ -1,6 +1,7 @@
 generation:
   default_row_count: 1000
   ctgan_epochs: 10
+  seed: 42
 
 output:
   directory: data/output/jobs
