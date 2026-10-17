@@ -5,6 +5,7 @@ from uuid import uuid4
 import json
 from synthetic_data.api.metrics import Metrics
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.exceptions import RequestValidationError
 from synthetic_data import __version__
@@ -92,6 +93,18 @@ app = FastAPI(
         "generation jobs, monitoring execution, and retrieving artifacts."
     ),
     lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://synthetic-data-platform.jegadeesh942.workers.dev",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Accept"],
 )
 
 app.add_exception_handler(APIError, api_error_handler)
