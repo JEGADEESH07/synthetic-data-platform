@@ -1,5 +1,5 @@
 import json
-
+from pathlib import Path
 import sqlite3
 from datetime import datetime
 
@@ -11,6 +11,10 @@ class JobRepository:
 
     def __init__(self, database_path: str):
         self.database_path = database_path
+        Path(self.database_path).parent.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
         self._initialize_database()
 
     def _connect(self) -> sqlite3.Connection:
