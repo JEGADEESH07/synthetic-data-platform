@@ -12,6 +12,7 @@ from synthetic_data.audit import (
     fingerprint_dataset,
     fingerprint_schema,
 )
+from synthetic_data.evaluation import evaluate_statistical_quality
 from synthetic_data.config import load_config
 from synthetic_data.persistence import ArtifactPaths, persist_artifacts
 from synthetic_data.privacy import evaluate_privacy
@@ -68,6 +69,13 @@ class V02Engine:
                 detection=result.detection,
             )
 
+            quality_report = evaluate_statistical_quality(
+                source_dataframe=result.source_dataframe,
+                synthetic_dataframe=synthetic_dataframe,
+                policy=result.policy,
+                minimum_score=config.quality.minimum_score,
+            )
+
             audit_metadata: dict[str, Any] = {
                 "engine": capture_engine_version(),
                 "environment": capture_environment(),
@@ -112,6 +120,7 @@ class V02Engine:
                 output_root=self.output_root,
                 job_id=job_id,
                 audit_metadata=audit_metadata,
+                statistical_quality_report=quality_report,
             )
 
         except Exception as exc:

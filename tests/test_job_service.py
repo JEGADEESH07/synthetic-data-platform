@@ -264,3 +264,36 @@ def test_list_queued_jobs_returns_only_queued_jobs(tmp_path):
     jobs = service.list_queued_jobs()
 
     assert [job.job_id for job in jobs] == ["queued-job"]
+
+
+def test_list_all_jobs_returns_all_jobs_newest_first(tmp_path):
+    service = create_service(tmp_path)
+
+    older_job = service.create_job(
+        job_id="older-job",
+        input_file="data/older.csv",
+        row_count=10,
+    )
+    newer_job = service.create_job(
+        job_id="newer-job",
+        input_file="data/newer.csv",
+        row_count=20,
+    )
+
+    # Set distinct timestamps to verify the ordering.
+    older_job.created_at = datetime(
+        2026, 1, 1, tzinfo=timezone.utc
+    )
+    newer_job.created_at = datetime(
+        2026, 1, 2, tzinfo=timezone.utc
+    )
+
+    service.repository.update(older_job)
+    service.repository.update(newer_job)
+
+    jobs = service.list_all_jobs()
+
+    assert [job.job_id for job in jobs] == [
+        "newer-job",
+        "older-job",
+    ]

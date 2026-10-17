@@ -49,3 +49,8 @@ class ArtifactListResponse(BaseModel):
 class ErrorResponse(BaseModel):
     error_code: str
     message: str
+
+class DashboardSummaryResponse(BaseModel):
+    datasets_generated: int
+    quality_evaluations: int
+    privacy_assessments: int

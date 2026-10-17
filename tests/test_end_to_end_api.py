@@ -114,3 +114,63 @@ def test_api_to_engine_end_to_end(tmp_path, monkeypatch):
         )
         assert report_response.status_code == 200
         assert len(report_response.content) > 0
+
+
+def test_list_jobs_returns_empty_list(tmp_path, monkeypatch):
+    output_root = tmp_path / "jobs"
+    output_root.mkdir()
+
+    repository = JobRepository(output_root / "jobs.db")
+    service = JobService(repository)
+
+    monkeypatch.setattr(app_module, "job_repository", repository)
+    monkeypatch.setattr(app_module, "job_service", service)
+
+    with TestClient(app) as client:
+        response = client.get("/api/v1/jobs")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_list_jobs_returns_all_jobs_newest_first(tmp_path, monkeypatch):
+    from datetime import datetime, timezone
+
+    output_root = tmp_path / "jobs"
+    output_root.mkdir()
+
+    repository = JobRepository(output_root / "jobs.db")
+    service = JobService(repository)
+
+    older_job = service.create_job(
+        job_id="older-job",
+        input_file="data/older.csv",
+        row_count=10,
+    )
+    newer_job = service.create_job(
+        job_id="newer-job",
+        input_file="data/newer.csv",
+        row_count=20,
+    )
+
+    older_job.created_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    newer_job.created_at = datetime(2026, 1, 2, tzinfo=timezone.utc)
+
+    repository.update(older_job)
+    repository.update(newer_job)
+
+    monkeypatch.setattr(app_module, "job_repository", repository)
+    monkeypatch.setattr(app_module, "job_service", service)
+
+    with TestClient(app) as client:
+        response = client.get("/api/v1/jobs")
+
+    assert response.status_code == 200
+
+    jobs = response.json()
+    assert [job["job_id"] for job in jobs] == [
+        "newer-job",
+        "older-job",
+    ]
+    assert jobs[0]["row_count"] == 20
+    assert jobs[1]["row_count"] == 10

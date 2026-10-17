@@ -27,25 +27,25 @@ class StatisticalQualityReport:
 
     overall_score: float
     columns: tuple[ColumnQualityResult, ...]
+    minimum_score: float = 0.80
 
     @property
     def passed_columns(self) -> tuple[str, ...]:
-        """Return columns meeting the quality threshold."""
+        """Return columns meeting the configured quality threshold."""
         return tuple(
             result.column_name
             for result in self.columns
-            if result.score >= 0.8
+            if result.score >= self.minimum_score
         )
 
     @property
     def failed_columns(self) -> tuple[str, ...]:
-        """Return columns below the quality threshold."""
+        """Return columns below the configured quality threshold."""
         return tuple(
             result.column_name
             for result in self.columns
-            if result.score < 0.8
+            if result.score < self.minimum_score
         )
-
 
 def _clamp_score(value: float) -> float:
     """Keep quality scores between 0 and 1."""
@@ -178,8 +178,18 @@ def evaluate_statistical_quality(
     source_dataframe: pd.DataFrame,
     synthetic_dataframe: pd.DataFrame,
     policy: MetadataPolicy,
+    minimum_score: float = 0.80,
 ) -> StatisticalQualityReport:
     """Compare statistical characteristics of trainable columns."""
+
+    if (
+        isinstance(minimum_score, bool)
+        or not isinstance(minimum_score, (int, float))
+        or not 0.0 <= minimum_score <= 1.0
+    ):
+        raise ValueError(
+            "minimum_score must be a number between 0 and 1"
+        )
 
     if not isinstance(source_dataframe, pd.DataFrame):
         raise TypeError(
@@ -284,4 +294,5 @@ def evaluate_statistical_quality(
     return StatisticalQualityReport(
         overall_score=overall_score,
         columns=tuple(results),
+        minimum_score=float(minimum_score),
     )

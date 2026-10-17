@@ -1,0 +1,10 @@
+$env:Path = "C:\Program Files\nodejs;$env:Path" - node
+.venv\Scripts\Activate.ps1 - venv
+
+'frontend server'
+cd frontend
+$env:Path = "C:\Program Files\nodejs;$env:Path"
+npm run dev
+
+'backend'
+uvicorn synthetic_data.api.app:app --reload

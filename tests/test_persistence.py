@@ -12,7 +12,8 @@ from synthetic_data.persistence import (
 )
 from synthetic_data.privacy import evaluate_privacy
 from synthetic_data.validation import validate_schema
-
+from synthetic_data.evaluation import evaluate_statistical_quality
+from synthetic_data.metadata import build_metadata_policy
 
 def build_test_results():
     """Create valid evaluation objects for persistence tests."""
@@ -253,3 +254,58 @@ def test_persisted_report_contains_audit_metadata(tmp_path):
     )
 
     assert report["audit"] == audit_metadata
+
+
+def test_persisted_report_contains_statistical_quality(tmp_path):
+    """Persisted report should include statistical quality results."""
+
+    synthetic, schema_result, privacy_report = build_test_results()
+
+    source = pd.DataFrame(
+        {
+            "Age": [25, 30],
+        }
+    )
+    synthetic_quality_data = synthetic[["Age"]].copy()
+
+    detection = detect_identifiers(source)
+    policy = build_metadata_policy(source, detection)
+
+    quality_report = evaluate_statistical_quality(
+        source_dataframe=source,
+        synthetic_dataframe=synthetic_quality_data,
+        policy=policy,
+    )
+
+    artifacts = persist_artifacts(
+        synthetic_dataframe=synthetic,
+        schema_result=schema_result,
+        privacy_report=privacy_report,
+        output_root=tmp_path,
+        job_id="job_test_quality",
+        statistical_quality_report=quality_report,
+    )
+
+    report = json.loads(
+        artifacts.report_path.read_text(encoding="utf-8")
+    )
+    quality = report["statistical_quality_report"]
+
+    assert quality["overall_score"] == pytest.approx(
+        quality_report.overall_score
+    )
+    assert quality["minimum_score"] == pytest.approx(
+        quality_report.minimum_score
+    )
+    assert quality["passed_columns"] == list(
+        quality_report.passed_columns
+    )
+    assert quality["failed_columns"] == list(
+        quality_report.failed_columns
+    )
+    assert len(quality["columns"]) == len(quality_report.columns)
+    assert quality["columns"][0]["column_name"] == "Age"
+    assert quality["columns"][0]["score"] == pytest.approx(
+        quality_report.columns[0].score
+    )
+    assert "details" in quality["columns"][0]
