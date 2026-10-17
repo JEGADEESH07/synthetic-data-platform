@@ -50,6 +50,12 @@ class JobService:
         """Return persisted jobs currently marked as running."""
         return self.repository.list_by_status(JobStatus.RUNNING)
 
+
+    def list_all_jobs(self) -> list[Job]:
+        """Return all persisted jobs, newest first."""
+        return self.repository.list_all()
+
+
     def set_execution_metadata(
         self,
         job_id: str,

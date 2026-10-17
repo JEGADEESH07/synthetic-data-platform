@@ -132,6 +132,19 @@ class JobRepository:
         return [self._row_to_job(row) for row in rows]
 
 
+    def list_all(self) -> list[Job]:
+        """Return all persisted jobs, newest first."""
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM jobs
+                ORDER BY created_at DESC, job_id DESC
+                """
+            ).fetchall()
+
+        return [self._row_to_job(row) for row in rows]
+
+
     def update(self, job: Job) -> None:
         with self._connect() as connection:
             connection.execute(

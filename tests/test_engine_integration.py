@@ -2,10 +2,10 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
-
+from synthetic_data.identifiers import detect_identifiers
 from synthetic_data.persistence import ArtifactPaths
 from synthetic_data.worker.engine import EngineExecutionError, V02Engine
-
+from synthetic_data.metadata import build_metadata_policy
 
 def test_engine_executes_v02_pipeline(monkeypatch, tmp_path):
     source = pd.DataFrame(
@@ -21,11 +21,17 @@ def test_engine_executes_v02_pipeline(monkeypatch, tmp_path):
             "Age": [27, 33],
         }
     )
+    detection = detect_identifiers(source)
+    policy = build_metadata_policy(source, detection)
 
     class FakeResult:
         source_dataframe = source
         synthetic_dataframe = synthetic
-        detection = object()
+
+
+    fake_result = FakeResult()
+    fake_result.detection = detection
+    fake_result.policy = policy
 
     artifacts = ArtifactPaths(
         job_id="job-001",
@@ -36,7 +42,7 @@ def test_engine_executes_v02_pipeline(monkeypatch, tmp_path):
 
     monkeypatch.setattr(
         "synthetic_data.worker.engine.run_pipeline",
-        lambda file_path, row_count, config=None: FakeResult(),
+        lambda file_path, row_count, config=None: fake_result,
 
     )
 
@@ -48,6 +54,11 @@ def test_engine_executes_v02_pipeline(monkeypatch, tmp_path):
     monkeypatch.setattr(
         "synthetic_data.worker.engine.evaluate_privacy",
         lambda source_dataframe, synthetic_dataframe, detection: object(),
+    )
+
+    monkeypatch.setattr(
+        "synthetic_data.worker.engine.evaluate_statistical_quality",
+        lambda source_dataframe, synthetic_dataframe, policy, minimum_score: object(),
     )
 
     monkeypatch.setattr(

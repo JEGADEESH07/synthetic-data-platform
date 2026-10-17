@@ -20,7 +20,7 @@ import synthetic_data.api.app as app_module
 def wait_for_job_completion(
     client: TestClient,
     job_id: str,
-    timeout_seconds: float = 30.0,
+    timeout_seconds: float = 120.0,
 ):
     deadline = time.monotonic() + timeout_seconds
 

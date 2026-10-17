@@ -10,7 +10,11 @@ import pandas as pd
 
 from synthetic_data.privacy import PrivacyReport
 from synthetic_data.validation import SchemaValidationResult
-
+from synthetic_data.evaluation.statistical import (
+    StatisticalQualityReport,
+)
+from synthetic_data.privacy import PrivacyReport
+from synthetic_data.validation import SchemaValidationResult
 
 class ArtifactPersistenceError(Exception):
     """Raised when generated artifacts cannot be persisted."""
@@ -44,9 +48,33 @@ def _build_report(
     synthetic_dataframe: pd.DataFrame,
     schema_result: SchemaValidationResult,
     privacy_report: PrivacyReport,
+    statistical_quality_report: StatisticalQualityReport | None = None,
     audit_metadata: dict | None = None,
 ) -> dict:
     """Build a JSON-serializable run report."""
+
+    statistical_quality_data = None
+
+    if statistical_quality_report is not None:
+        statistical_quality_data = {
+            "overall_score": statistical_quality_report.overall_score,
+            "minimum_score": statistical_quality_report.minimum_score,
+            "passed_columns": list(
+                statistical_quality_report.passed_columns
+            ),
+            "failed_columns": list(
+                statistical_quality_report.failed_columns
+            ),
+            "columns": [
+                {
+                    "column_name": column.column_name,
+                    "column_type": column.column_type,
+                    "score": column.score,
+                    "details": column.details,
+                }
+                for column in statistical_quality_report.columns
+            ],
+        }
 
     return {
         "job_id": job_id,
@@ -69,6 +97,7 @@ def _build_report(
             "column_count": schema_result.column_count,
             "columns": list(schema_result.columns),
         },
+        "statistical_quality_report": statistical_quality_data,
         "privacy": {
             "status": privacy_report.status,
             "total_exact_matches": (
@@ -119,6 +148,7 @@ def persist_artifacts(
     output_root: str | Path = "data/output/jobs",
     job_id: str | None = None,
     audit_metadata: dict | None = None,
+    statistical_quality_report: StatisticalQualityReport | None = None,
 ) -> ArtifactPaths:
     """Persist generated artifacts to disk."""
 
@@ -189,6 +219,7 @@ def persist_artifacts(
             synthetic_dataframe=synthetic_dataframe,
             schema_result=schema_result,
             privacy_report=privacy_report,
+            statistical_quality_report=statistical_quality_report,
             audit_metadata=audit_metadata,
         )
 

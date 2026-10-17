@@ -226,3 +226,27 @@ def test_repository_lists_jobs_by_status(tmp_path):
 
     assert [job.job_id for job in queued_jobs] == ["queued-job"]
     assert queued_jobs[0].status == JobStatus.QUEUED
+
+
+def test_repository_lists_all_jobs_newest_first(tmp_path):
+    repository = JobRepository(str(tmp_path / "jobs.db"))
+
+    older_job = create_job("older-job")
+    older_job.created_at = datetime(
+        2026, 1, 1, tzinfo=timezone.utc
+    )
+
+    newer_job = create_job("newer-job")
+    newer_job.created_at = datetime(
+        2026, 1, 2, tzinfo=timezone.utc
+    )
+
+    repository.create(older_job)
+    repository.create(newer_job)
+
+    jobs = repository.list_all()
+
+    assert [job.job_id for job in jobs] == [
+        "newer-job",
+        "older-job",
+    ]

@@ -1,6 +1,8 @@
-﻿"""CTGAN-based synthetic data generation."""
+"""CTGAN-based synthetic data generation."""
 import random
+from time import perf_counter
 
+from synthetic_data.logging_config import get_logger
 import numpy as np
 import torch
 from dataclasses import dataclass
@@ -10,10 +12,17 @@ from sdv.metadata import SingleTableMetadata
 from sdv.single_table import CTGANSynthesizer
 
 from synthetic_data.metadata import MetadataPolicy
+import warnings
 
+from sdv.single_table.ctgan import (
+    CTGAN,
+    _validate_no_category_dtype,
+    detect_discrete_columns,
+)
 
 from contextlib import contextmanager
 
+logger = get_logger("generation")
 
 @contextmanager
 def _seeded_training_context(seed: int):
@@ -81,6 +90,39 @@ def _build_sdv_metadata(
 
     return metadata
 
+class _SeededCTGANSynthesizer(CTGANSynthesizer):
+    """CTGAN synthesizer that seeds its model before training."""
+
+    def __init__(self, *args, training_seed: int, **kwargs):
+        self._training_seed = training_seed
+        super().__init__(*args, **kwargs)
+
+    def _fit(self, processed_data):
+        _validate_no_category_dtype(processed_data)
+
+        transformers = (
+            self._data_processor
+            ._hyper_transformer
+            .field_transformers
+        )
+        discrete_columns = detect_discrete_columns(
+            self.metadata,
+            processed_data,
+            transformers,
+        )
+
+        self._model = CTGAN(**self._model_kwargs)
+        self._model.set_random_state(self._training_seed)
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message=".*Attempting to run cuBLAS.*",
+            )
+            self._model.fit(
+                processed_data,
+                discrete_columns=discrete_columns,
+            )
 
 def generate_synthetic_data(
     dataframe: pd.DataFrame,
@@ -127,25 +169,58 @@ def generate_synthetic_data(
         )
 
     try:
+        metadata_started = perf_counter()
+
         metadata = _build_sdv_metadata(
             training_data,
             policy,
         )
 
-        synthesizer = CTGANSynthesizer(
+        logger.info(
+            "CTGAN metadata construction completed | "
+            "duration_seconds=%.2f | rows=%d | columns=%d",
+            perf_counter() - metadata_started,
+            len(training_data),
+            len(training_data.columns),
+        )
+
+        synthesizer = _SeededCTGANSynthesizer(
             metadata,
             epochs=generation_config.ctgan_epochs,
             verbose=False,
+            training_seed=generation_config.seed,
         )
+
+        training_started = perf_counter()
 
         with _seeded_training_context(generation_config.seed):
+
+
+
             synthesizer.fit(training_data)
 
-        synthesizer._set_random_state(generation_config.seed)
+            logger.info(
+                "CTGAN training completed | "
+                "duration_seconds=%.2f | epochs=%d | rows=%d | columns=%d",
+                perf_counter() - training_started,
+                generation_config.ctgan_epochs,
+                len(training_data),
+                len(training_data.columns),
+            )
+            synthesizer._set_random_state(generation_config.seed)
+            sampling_started = perf_counter()
 
-        synthetic_data = synthesizer.sample(
-            num_rows=row_count
+            synthetic_data = synthesizer.sample(
+                num_rows=row_count
+            )
+
+        logger.info(
+            "CTGAN sampling completed | "
+            "duration_seconds=%.2f | requested_rows=%d",
+            perf_counter() - sampling_started,
+            row_count,
         )
+
 
     except Exception as exc:
         raise SyntheticGenerationError(

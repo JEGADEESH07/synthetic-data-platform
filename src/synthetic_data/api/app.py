@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
+import json
 from synthetic_data.api.metrics import Metrics
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
@@ -20,6 +21,7 @@ from synthetic_data.api.errors import (
 from synthetic_data.api.logging import configure_api_logging
 from synthetic_data.api.schemas import (
     ArtifactListResponse,
+    DashboardSummaryResponse,
     JobCreateRequest,
     JobCreateResponse,
     JobStatusResponse,
@@ -380,6 +382,106 @@ def _get_input_config():
     from synthetic_data.config.settings import InputConfig
 
     return InputConfig()
+
+
+@app.get(
+    "/api/v1/dashboard/summary",
+    response_model=DashboardSummaryResponse,
+)
+def get_dashboard_summary() -> DashboardSummaryResponse:
+    jobs = job_service.list_all_jobs()
+    output_root = artifact_manager.output_root.resolve()
+
+    datasets_generated = 0
+    quality_evaluations = 0
+    privacy_assessments = 0
+
+    for job in jobs:
+        if job.status.value != "SUCCEEDED":
+            continue
+
+        datasets_generated += 1
+
+        try:
+            job_directory = (output_root / job.job_id).resolve()
+            job_directory.relative_to(output_root)
+
+            report_path = job_directory / "report.json"
+            report_path.resolve().relative_to(job_directory)
+
+            if not report_path.is_file():
+                continue
+
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+
+            if not isinstance(report, dict):
+                continue
+
+            if isinstance(report.get("statistical_quality"), dict):
+                quality_evaluations += 1
+
+            if isinstance(report.get("privacy"), dict):
+                privacy_assessments += 1
+
+        except (OSError, ValueError, RuntimeError):
+            # Ignore missing, invalid, or unsafe report files.
+            continue
+
+    return DashboardSummaryResponse(
+        datasets_generated=datasets_generated,
+        quality_evaluations=quality_evaluations,
+        privacy_assessments=privacy_assessments,
+    )
+
+@app.get(
+    "/api/v1/jobs",
+    response_model=list[JobStatusResponse],
+)
+def list_jobs() -> list[JobStatusResponse]:
+    jobs = job_service.list_all_jobs()
+    responses = []
+
+    for job in jobs:
+        duration_seconds: float | None = None
+
+        if job.started_at is not None:
+            end_time = job.completed_at or datetime.now(timezone.utc)
+            duration_seconds = (
+                end_time - job.started_at
+            ).total_seconds()
+
+        responses.append(
+            JobStatusResponse(
+                job_id=job.job_id,
+                status=job.status,
+                input_file=job.input_file,
+                row_count=job.row_count,
+                input_columns=job.input_columns,
+                created_at=job.created_at.isoformat(),
+                started_at=(
+                    job.started_at.isoformat()
+                    if job.started_at is not None
+                    else None
+                ),
+                completed_at=(
+                    job.completed_at.isoformat()
+                    if job.completed_at is not None
+                    else None
+                ),
+                duration_seconds=duration_seconds,
+                execution_stage=job.execution_stage,
+                progress=job.progress,
+                completed_units=job.completed_units,
+                total_units=job.total_units,
+                execution_metadata=job.execution_metadata,
+                synthetic_data_path=job.synthetic_data_path,
+                report_path=job.report_path,
+                error_code=job.error_code,
+                error_message=job.error_message,
+            )
+        )
+
+    return responses
 
 
 @app.get(
